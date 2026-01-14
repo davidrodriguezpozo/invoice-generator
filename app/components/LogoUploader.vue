@@ -102,8 +102,7 @@ const logo = computed(() => invoice.value.logo)
 const compressImage = (
   file: File,
   maxWidth: number = 200,
-  maxHeight: number = 200,
-  quality: number = 0.8
+  maxHeight: number = 200
 ): Promise<string> => {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas')
@@ -127,9 +126,15 @@ const compressImage = (
 
       canvas.width = width
       canvas.height = height
-      ctx?.drawImage(img, 0, 0, width, height)
 
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
+      // Fill with white background to handle transparent images
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillRect(0, 0, width, height)
+        ctx.drawImage(img, 0, 0, width, height)
+      }
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.9)
       resolve(compressedDataUrl)
     }
 
@@ -140,7 +145,7 @@ const compressImage = (
 const processFile = async (file: File) => {
   if (file && file.type.startsWith('image/')) {
     try {
-      const compressedLogo = await compressImage(file, 200, 200, 0.8)
+      const compressedLogo = await compressImage(file, 200, 200)
       setLogo(compressedLogo)
     } catch (error) {
       console.error('Error compressing image:', error)

@@ -872,8 +872,13 @@ const handleLogoUpload = async (event: Event) => {
     else if (height > maxSize) { width = (width * maxSize) / height; height = maxSize }
     canvas.width = width
     canvas.height = height
-    ctx?.drawImage(img, 0, 0, width, height)
-    invoice.value.logo = canvas.toDataURL('image/jpeg', 0.8)
+    // Fill with white background to handle transparent images
+    if (ctx) {
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, width, height)
+      ctx.drawImage(img, 0, 0, width, height)
+    }
+    invoice.value.logo = canvas.toDataURL('image/jpeg', 0.9)
     localStorage.setItem(LOGO_KEY, invoice.value.logo)
   }
   img.src = URL.createObjectURL(file)
