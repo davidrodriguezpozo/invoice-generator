@@ -11,7 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable
-      - uses: oven-sh/setup-bun@v1
+      - uses: oven-sh/setup-bun@v2
+        name: Install bun
+        id: bun-install
       # Pick your own package manager and build script
       - run: bun install
       - run: bunx nuxt build --preset github_pages
