@@ -61,6 +61,19 @@
         </button>
 
         <button
+          @click="showChaos = true"
+          :class="[
+            'hidden sm:inline-flex text-xs font-medium px-3 py-1.5 transition-colors',
+            chaosEnabled
+              ? 'bg-stone-900 text-white'
+              : 'text-stone-500 hover:text-stone-900'
+          ]"
+          title="Generate chaotic test data"
+        >
+          Chaos
+        </button>
+
+        <button
           @click="showExport = true"
           :disabled="!canDownload"
           class="btn-primary inline-flex"
@@ -644,12 +657,41 @@
         </TransitionGroup>
       </div>
     </Teleport>
+
+    <!-- Chaos Config Modal -->
+    <ChaosConfigModal
+      :is-open="showChaos"
+      @close="showChaos = false"
+      @apply="handleApplyChaos"
+    />
+
+    <!-- Chaos Mode Banner -->
+    <Transition name="slide-down">
+      <div
+        v-if="chaosEnabled"
+        class="fixed top-14 left-0 right-0 z-40 bg-stone-900 text-white px-4 py-1.5 flex items-center justify-center gap-3 text-xs"
+      >
+        <span class="text-stone-400">Chaos Mode</span>
+        <span class="text-stone-500">|</span>
+        <span>Data is intentionally incorrect</span>
+        <button
+          @click="handleResetChaos"
+          class="ml-2 text-stone-400 hover:text-white transition-colors"
+        >
+          Reset
+        </button>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
+import ChaosConfigModal from './components/ChaosConfigModal.vue'
+import { useChaosMode } from './composables/useChaosMode'
+
+const { chaosEnabled, generateChaoticInvoice, resetChaosMode, chaosOverrides } = useChaosMode()
 
 // Types
 interface InvoiceItem {
@@ -817,6 +859,7 @@ const t = (key: string) => translations[language.value]?.[key] || translations.E
 
 const showHistory = ref(false)
 const showExport = ref(false)
+const showChaos = ref(false)
 const isExporting = ref(false)
 const exportingFormat = ref<string | null>(null)
 const showCustomerDropdown = ref(false)
@@ -828,10 +871,25 @@ const isDragging = ref(false)
 const logoInput = ref<HTMLInputElement | null>(null)
 const watermarkLogo = ref<string | null>(null)
 
-// Computed
-const subtotal = computed(() => invoice.value.items.reduce((sum, item) => sum + item.quantity * item.price, 0))
-const totalTax = computed(() => invoice.value.items.reduce((sum, item) => sum + (item.quantity * item.price * item.tax) / 100, 0))
-const total = computed(() => subtotal.value + totalTax.value)
+// Computed (with chaos override support)
+const subtotal = computed(() => {
+  if (chaosOverrides.value?.subtotal !== undefined) {
+    return chaosOverrides.value.subtotal
+  }
+  return invoice.value.items.reduce((sum, item) => sum + item.quantity * item.price, 0)
+})
+const totalTax = computed(() => {
+  if (chaosOverrides.value?.totalTax !== undefined) {
+    return chaosOverrides.value.totalTax
+  }
+  return invoice.value.items.reduce((sum, item) => sum + (item.quantity * item.price * item.tax) / 100, 0)
+})
+const total = computed(() => {
+  if (chaosOverrides.value?.total !== undefined) {
+    return chaosOverrides.value.total
+  }
+  return subtotal.value + totalTax.value
+})
 const canDownload = computed(() => invoice.value.number?.trim() && invoice.value.from.businessName?.trim() && invoice.value.to.customerName?.trim())
 
 // Methods
@@ -964,7 +1022,25 @@ const handleClear = () => {
       notes: '',
       terms: ''
     }
+    resetChaosMode()
   }
+}
+
+const handleApplyChaos = () => {
+  const chaoticInvoice = generateChaoticInvoice()
+  // Preserve logo if exists
+  const currentLogo = invoice.value.logo
+  invoice.value = chaoticInvoice
+  if (currentLogo) {
+    invoice.value.logo = currentLogo
+  }
+  showChaos.value = false
+  showToast('Chaos unleashed!')
+}
+
+const handleResetChaos = () => {
+  resetChaosMode()
+  showToast('Chaos mode disabled')
 }
 
 const handleSave = () => {
@@ -1698,6 +1774,10 @@ input[type="number"] { -moz-appearance: textfield; }
 .slide-enter-active { transition: transform 0.2s ease-out; }
 .slide-leave-active { transition: transform 0.15s ease-in; }
 .slide-enter-from, .slide-leave-to { transform: translateX(100%); }
+
+.slide-down-enter-active { transition: all 0.3s ease-out; }
+.slide-down-leave-active { transition: all 0.2s ease-in; }
+.slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-100%); }
 
 .toast-enter-active { transition: all 0.2s ease-out; }
 .toast-leave-active { transition: all 0.15s ease-in; }

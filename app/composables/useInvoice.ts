@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
+import { useChaosMode } from './useChaosMode'
 
 // Types
 export interface InvoiceItem {
@@ -261,19 +262,33 @@ export function useInvoice() {
     isInitialized.value = true
   }
 
-  // Computed properties
+  // Chaos mode integration
+  const { chaosOverrides, generateChaoticInvoice, resetChaosMode, chaosEnabled } = useChaosMode()
+
+  // Computed properties (with chaos override support)
   const subtotal = computed(() => {
+    if (chaosOverrides.value?.subtotal !== undefined) {
+      return chaosOverrides.value.subtotal
+    }
     return invoice.value.items.reduce((sum, item) => sum + item.quantity * item.price, 0)
   })
 
   const totalTax = computed(() => {
+    if (chaosOverrides.value?.totalTax !== undefined) {
+      return chaosOverrides.value.totalTax
+    }
     return invoice.value.items.reduce((sum, item) => {
       const itemSubtotal = item.quantity * item.price
       return sum + (itemSubtotal * item.tax) / 100
     }, 0)
   })
 
-  const total = computed(() => subtotal.value + totalTax.value)
+  const total = computed(() => {
+    if (chaosOverrides.value?.total !== undefined) {
+      return chaosOverrides.value.total
+    }
+    return subtotal.value + totalTax.value
+  })
 
   const canDownload = computed(() => {
     return (
@@ -371,6 +386,18 @@ export function useInvoice() {
 
   const clearInvoice = () => {
     invoice.value = getDefaultInvoice(loadDefaultLogo())
+    resetChaosMode()
+  }
+
+  // Apply chaos mode to current invoice
+  const applyChaosMode = () => {
+    const chaoticInvoice = generateChaoticInvoice()
+    // Preserve logo if exists
+    const currentLogo = invoice.value.logo
+    invoice.value = chaoticInvoice
+    if (currentLogo) {
+      invoice.value.logo = currentLogo
+    }
   }
 
   // Customer management
@@ -542,6 +569,12 @@ export function useInvoice() {
     formatDate,
     setDueDateFromInvoiceDate,
     loadDefaultLogo,
+
+    // Chaos Mode
+    chaosEnabled,
+    chaosOverrides,
+    applyChaosMode,
+    resetChaosMode,
 
     // Constants
     PDF_THEME,

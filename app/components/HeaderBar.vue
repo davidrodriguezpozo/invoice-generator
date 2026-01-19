@@ -98,6 +98,24 @@
             <span class="hidden sm:inline">{{ t('clear') }}</span>
           </button>
 
+          <!-- Chaos Mode Button -->
+          <button
+            @click="$emit('openChaos')"
+            :class="[
+              'h-9 px-3 text-sm rounded-lg flex items-center gap-2 transition-all font-medium',
+              chaosEnabled
+                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/25'
+                : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            ]"
+            aria-label="Chaos Mode"
+            title="Generate chaotic test data"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span class="hidden sm:inline">Chaos</span>
+          </button>
+
           <!-- Export Button (Primary CTA) -->
           <button
             @click="$emit('openExport')"
@@ -163,10 +181,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   openHistory: []
   openExport: []
+  openChaos: []
   setMobileView: [view: 'form' | 'preview']
 }>()
 
-const { currency, language, setLanguage, canDownload, saveCurrentInvoice, clearInvoice } = useInvoice()
+const { currency, language, setLanguage, canDownload, saveCurrentInvoice, clearInvoice, chaosEnabled } = useInvoice()
 const { t, availableLanguages } = useTranslations()
 const { success, error } = useToast()
 
