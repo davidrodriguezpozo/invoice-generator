@@ -21,15 +21,73 @@
             <h2 class="text-lg font-semibold text-gray-900">{{ t('invoiceHistory') }}</h2>
             <p class="text-sm text-gray-500">{{ invoiceHistory.length }} {{ t('savedInvoices') }}</p>
           </div>
-          <button
-            @click="$emit('close')"
-            class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
-            :aria-label="t('closeHistory')"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div class="flex items-center gap-2">
+            <!-- Export All Dropdown -->
+            <div v-if="invoiceHistory.length > 0" class="relative">
+              <button
+                @click="showExportMenu = !showExportMenu"
+                :disabled="isExporting"
+                class="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <svg v-if="isExporting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span v-if="isExporting && exportProgress.total > 0">
+                  {{ exportProgress.current }}/{{ exportProgress.total }}
+                </span>
+                <span v-else>Export All</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <!-- Dropdown Menu -->
+              <div
+                v-if="showExportMenu"
+                class="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10"
+              >
+                <button
+                  @click="handleExportAll('zip')"
+                  class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  ZIP (PDFs)
+                </button>
+                <button
+                  @click="handleExportAll('json')"
+                  class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  JSON
+                </button>
+                <button
+                  @click="handleExportAll('csv')"
+                  class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  CSV
+                </button>
+              </div>
+            </div>
+            <button
+              @click="$emit('close')"
+              class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
+              :aria-label="t('closeHistory')"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Search -->
@@ -129,13 +187,23 @@ import { useInvoice, type SavedInvoice } from '../composables/useInvoice'
 import { useTranslations } from '../composables/useTranslations'
 import { useToast } from '../composables/useToast'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
+  isExporting?: boolean
+  exportProgress?: { current: number; total: number }
 }>()
 
 const emit = defineEmits<{
   close: []
+  exportAll: [format: 'zip' | 'json' | 'csv']
 }>()
+
+const showExportMenu = ref(false)
+
+const handleExportAll = (format: 'zip' | 'json' | 'csv') => {
+  showExportMenu.value = false
+  emit('exportAll', format)
+}
 
 const {
   invoiceHistory,

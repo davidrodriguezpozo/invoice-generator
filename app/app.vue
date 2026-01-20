@@ -54,10 +54,16 @@
 
         <button
           @click="handleSave"
-          :disabled="!canDownload"
-          class="btn-secondary hidden sm:inline-flex"
+          :disabled="!canDownload || justSaved"
+          :class="[
+            'hidden sm:inline-flex items-center gap-1.5 transition-all duration-200',
+            justSaved ? 'btn-success' : 'btn-secondary'
+          ]"
         >
-          Save
+          <svg v-if="justSaved" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          {{ justSaved ? 'Saved!' : 'Save' }}
         </button>
 
         <button
@@ -68,17 +74,34 @@
               ? 'bg-stone-900 text-white'
               : 'text-stone-500 hover:text-stone-900'
           ]"
-          title="Generate chaotic test data"
+          title="Configure chaos mode settings"
         >
           Chaos
         </button>
 
         <button
-          @click="showExport = true"
-          :disabled="!canDownload"
-          class="btn-primary inline-flex"
+          @click="showBulkGenerate = true"
+          class="hidden sm:inline-flex text-xs font-medium px-3 py-1.5 transition-colors text-stone-500 hover:text-stone-900 items-center gap-1"
+          title="Generate multiple test invoices"
         >
-          Export
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          Bulk
+        </button>
+
+        <button
+          @click="showExport = true"
+          :disabled="!canDownload || justExported"
+          :class="[
+            'inline-flex items-center gap-1.5 transition-all duration-200',
+            justExported ? 'btn-success' : 'btn-primary'
+          ]"
+        >
+          <svg v-if="justExported" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          {{ justExported ? 'Exported!' : 'Export' }}
         </button>
       </div>
     </header>
@@ -148,13 +171,18 @@
           <!-- Invoice Details -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
-              <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number</label>
+              <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number *</label>
               <input
                 v-model="invoice.number"
                 type="text"
                 placeholder="INV-001"
-                class="w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors"
+                @blur="validateField('invoiceNumber')"
+                :class="[
+                  'w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1 transition-colors',
+                  fieldErrors.invoiceNumber ? 'border-red-400 focus:border-red-500' : 'border-stone-200 focus:border-stone-900'
+                ]"
               />
+              <span v-if="fieldErrors.invoiceNumber" class="text-[10px] text-red-500 mt-1 block">Required</span>
             </div>
             <div>
               <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Date</label>
@@ -177,13 +205,20 @@
           <!-- From / To -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
             <div class="space-y-3">
-              <label class="block text-[10px] uppercase tracking-wider text-stone-400">From</label>
-              <input
-                v-model="invoice.from.businessName"
-                type="text"
-                placeholder="Your business"
-                class="w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1"
-              />
+              <label class="block text-[10px] uppercase tracking-wider text-stone-400">From *</label>
+              <div>
+                <input
+                  v-model="invoice.from.businessName"
+                  type="text"
+                  placeholder="Your business"
+                  @blur="validateField('businessName')"
+                  :class="[
+                    'w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1',
+                    fieldErrors.businessName ? 'border-red-400 focus:border-red-500' : 'border-stone-200 focus:border-stone-900'
+                  ]"
+                />
+                <span v-if="fieldErrors.businessName" class="text-[10px] text-red-500 mt-1 block">Required</span>
+              </div>
               <input
                 v-model="invoice.from.email"
                 type="email"
@@ -213,7 +248,7 @@
             </div>
             <div class="space-y-3 relative">
               <div class="flex items-center justify-between">
-                <label class="block text-[10px] uppercase tracking-wider text-stone-400">To</label>
+                <label class="block text-[10px] uppercase tracking-wider text-stone-400">To *</label>
                 <div class="flex items-center gap-2">
                   <button
                     v-if="customers.length > 0"
@@ -254,12 +289,19 @@
                 </div>
               </div>
 
-              <input
-                v-model="invoice.to.customerName"
-                type="text"
-                placeholder="Client name"
-                class="w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1"
-              />
+              <div>
+                <input
+                  v-model="invoice.to.customerName"
+                  type="text"
+                  placeholder="Client name"
+                  @blur="validateField('customerName')"
+                  :class="[
+                    'w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1',
+                    fieldErrors.customerName ? 'border-red-400 focus:border-red-500' : 'border-stone-200 focus:border-stone-900'
+                  ]"
+                />
+                <span v-if="fieldErrors.customerName" class="text-[10px] text-red-500 mt-1 block">Required</span>
+              </div>
               <input
                 v-model="invoice.to.email"
                 type="email"
@@ -333,16 +375,19 @@
               </div>
 
               <!-- Desktop Items -->
-              <div
-                v-for="(item, index) in invoice.items"
-                :key="item.id"
-                class="hidden sm:grid grid-cols-12 gap-2 py-3 border-b border-stone-100 group items-center hover:bg-stone-50/50 transition-colors -mx-2 px-2"
-              >
+              <TransitionGroup name="item-list" tag="div" class="hidden sm:block relative">
+                <div
+                  v-for="(item, index) in invoice.items"
+                  :key="item.id"
+                  class="grid grid-cols-12 gap-2 py-3 border-b border-stone-100 group items-center hover:bg-stone-50/50 transition-colors -mx-2 px-2"
+                >
                 <div class="col-span-5">
                   <input
+                    :ref="(el) => setItemDescriptionRef(item.id, el as HTMLInputElement)"
                     v-model="item.description"
                     type="text"
                     placeholder="Item description"
+                    @keydown="handleItemKeydown($event, index)"
                     class="w-full text-sm text-stone-900 placeholder-stone-300 border-0 focus:ring-0 p-0 bg-transparent"
                   />
                 </div>
@@ -352,6 +397,7 @@
                     type="number"
                     min="0"
                     step="1"
+                    @keydown="handleItemKeydown($event, index)"
                     class="w-full text-sm text-stone-900 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
                   />
                 </div>
@@ -361,6 +407,7 @@
                     type="number"
                     min="0"
                     step="0.01"
+                    @keydown="handleItemKeydown($event, index)"
                     class="w-full text-sm text-stone-900 text-right border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
                   />
                 </div>
@@ -371,6 +418,7 @@
                     min="0"
                     max="100"
                     step="0.5"
+                    @keydown="handleItemKeydown($event, index)"
                     class="w-full text-sm text-stone-500 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
                   />
                 </div>
@@ -388,72 +436,79 @@
                     </svg>
                   </button>
                 </div>
-              </div>
+                </div>
+              </TransitionGroup>
 
               <!-- Mobile Items (Card Layout) -->
-              <div class="sm:hidden space-y-3 pt-2">
+              <TransitionGroup name="item-list" tag="div" class="sm:hidden space-y-4 pt-2 relative">
                 <div
                   v-for="(item, index) in invoice.items"
                   :key="'mobile-' + item.id"
-                  class="border border-stone-200 rounded-lg p-3 bg-white"
+                  class="border border-stone-200 rounded-lg p-4 bg-white shadow-sm"
                 >
-                  <div class="flex items-start justify-between gap-2 mb-3">
+                  <div class="flex items-center justify-between gap-3 mb-4">
                     <input
+                      :ref="(el) => setItemDescriptionRef('mobile-' + item.id, el as HTMLInputElement)"
                       v-model="item.description"
                       type="text"
                       placeholder="Item description"
-                      class="flex-1 text-sm text-stone-900 placeholder-stone-300 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 bg-transparent"
+                      @keydown="handleItemKeydown($event, index)"
+                      class="flex-1 text-sm text-stone-900 placeholder-stone-300 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 bg-transparent min-h-[44px]"
                     />
                     <button
                       @click="removeItem(index)"
-                      class="text-stone-400 hover:text-red-500 p-1 -m-1"
+                      class="text-stone-400 hover:text-red-500 active:text-red-600 active:bg-red-50 p-2 -m-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors"
+                      aria-label="Remove item"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                  <div class="grid grid-cols-4 gap-2">
+                  <div class="grid grid-cols-4 gap-3">
                     <div>
-                      <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Qty</label>
+                      <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Qty</label>
                       <input
                         v-model.number="item.quantity"
                         type="number"
                         min="0"
                         step="1"
-                        class="w-full text-sm text-stone-900 text-center border border-stone-200 rounded px-2 py-1 tabular-nums"
+                        @keydown="handleItemKeydown($event, index)"
+                        class="w-full text-sm text-stone-900 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
                       />
                     </div>
                     <div>
-                      <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Price</label>
+                      <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Price</label>
                       <input
                         v-model.number="item.price"
                         type="number"
                         min="0"
                         step="0.01"
-                        class="w-full text-sm text-stone-900 border border-stone-200 rounded px-2 py-1 tabular-nums"
+                        @keydown="handleItemKeydown($event, index)"
+                        class="w-full text-sm text-stone-900 border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
                       />
                     </div>
                     <div>
-                      <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Tax %</label>
+                      <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Tax %</label>
                       <input
                         v-model.number="item.tax"
                         type="number"
                         min="0"
                         max="100"
                         step="0.5"
-                        class="w-full text-sm text-stone-500 text-center border border-stone-200 rounded px-2 py-1 tabular-nums"
+                        @keydown="handleItemKeydown($event, index)"
+                        class="w-full text-sm text-stone-500 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
                       />
                     </div>
                     <div>
-                      <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Total</label>
-                      <div class="text-sm text-stone-900 font-medium tabular-nums py-1 text-right">
+                      <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Total</label>
+                      <div class="text-sm text-stone-900 font-medium tabular-nums py-2 text-right min-h-[44px] flex items-center justify-end">
                         {{ currency }}{{ ((item.quantity * item.price) * (1 + item.tax / 100)).toFixed(2) }}
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </TransitionGroup>
 
               <!-- Tax Presets -->
               <div class="pt-3 pb-2 flex flex-wrap items-center gap-2">
@@ -527,7 +582,13 @@
         ]"
       >
         <div v-if="isGeneratingPreview && !pdfPreviewUrl" class="flex-1 flex items-center justify-center">
-          <div class="text-xs text-stone-400">Generating preview...</div>
+          <div class="text-center">
+            <svg class="animate-spin w-8 h-8 mx-auto text-stone-300 mb-3" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p class="text-xs text-stone-400">Generating preview...</p>
+          </div>
         </div>
         <iframe
           v-else-if="pdfPreviewUrl"
@@ -536,7 +597,13 @@
           title="Invoice PDF Preview"
         />
         <div v-else class="flex-1 flex items-center justify-center">
-          <div class="text-xs text-stone-400">Preview will appear here</div>
+          <div class="text-center px-8">
+            <svg class="w-16 h-16 mx-auto text-stone-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p class="text-sm text-stone-400 mb-1">PDF preview</p>
+            <p class="text-xs text-stone-300">Fill in invoice details to see preview</p>
+          </div>
         </div>
       </div>
     </div>
@@ -549,12 +616,71 @@
       <Transition name="slide">
         <div v-if="showHistory" class="fixed inset-y-0 right-0 w-80 bg-white shadow-xl z-50 flex flex-col">
           <div class="p-4 border-b border-stone-200 flex items-center justify-between">
-            <span class="text-sm font-medium">History</span>
-            <button @click="showHistory = false" class="text-stone-400 hover:text-stone-600">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div>
+              <span class="text-sm font-medium block">History</span>
+              <span class="text-[10px] text-stone-400">{{ invoiceHistory.length }} invoices</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <!-- Export All Dropdown -->
+              <div v-if="invoiceHistory.length > 0" class="relative">
+                <button
+                  @click="showExportAllMenu = !showExportAllMenu"
+                  :disabled="isBulkExporting"
+                  class="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded transition-colors disabled:opacity-50"
+                  title="Export All"
+                >
+                  <svg v-if="isBulkExporting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+                <!-- Progress indicator -->
+                <span v-if="isBulkExporting && bulkExportProgress.total > 0" class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-stone-500 whitespace-nowrap">
+                  {{ bulkExportProgress.current }}/{{ bulkExportProgress.total }}
+                </span>
+                <!-- Dropdown Menu -->
+                <div
+                  v-if="showExportAllMenu"
+                  class="absolute right-0 mt-1 w-36 bg-white border border-stone-200 rounded shadow-lg z-10"
+                >
+                  <button
+                    @click="handleExportAll('zip'); showExportAllMenu = false"
+                    class="w-full text-left px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                  >
+                    <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                    ZIP (PDFs)
+                  </button>
+                  <button
+                    @click="handleExportAll('json'); showExportAllMenu = false"
+                    class="w-full text-left px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                  >
+                    <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    JSON
+                  </button>
+                  <button
+                    @click="handleExportAll('csv'); showExportAllMenu = false"
+                    class="w-full text-left px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                  >
+                    <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    CSV
+                  </button>
+                </div>
+              </div>
+              <button @click="showHistory = false" class="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="flex-1 overflow-y-auto">
             <div v-if="invoiceHistory.length === 0" class="p-8 text-center">
@@ -569,7 +695,7 @@
               >
                 <div class="flex items-center justify-between">
                   <span class="text-sm font-medium text-stone-900">{{ saved.invoice.number }}</span>
-                  <span class="text-xs text-stone-500 tabular-nums">{{ currency }}{{ saved.totalAmount.toFixed(2) }}</span>
+                  <span class="text-xs text-stone-500 tabular-nums">{{ currency }}{{ (saved.totalAmount ?? 0).toFixed(2) }}</span>
                 </div>
                 <div class="text-xs text-stone-400 mt-1">{{ saved.customerName }}</div>
                 <div class="flex items-center justify-between mt-2">
@@ -648,11 +774,18 @@
             v-for="toast in toasts"
             :key="toast.id"
             :class="[
-              'px-4 py-2 text-xs font-medium shadow-lg',
+              'px-4 py-2 text-xs font-medium shadow-lg flex items-center gap-3',
               toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-stone-900 text-white'
             ]"
           >
-            {{ toast.message }}
+            <span>{{ toast.message }}</span>
+            <button
+              v-if="toast.action"
+              @click="toast.action.handler"
+              class="text-white/70 hover:text-white font-semibold underline underline-offset-2 transition-colors"
+            >
+              {{ toast.action.label }}
+            </button>
           </div>
         </TransitionGroup>
       </div>
@@ -665,6 +798,13 @@
       @apply="handleApplyChaos"
     />
 
+    <!-- Bulk Generate Modal -->
+    <BulkGenerateModal
+      :is-open="showBulkGenerate"
+      @close="showBulkGenerate = false"
+      @generated="handleBulkGenerated"
+    />
+
     <!-- Chaos Mode Banner -->
     <Transition name="slide-down">
       <div
@@ -675,8 +815,19 @@
         <span class="text-stone-500">|</span>
         <span>Data is intentionally incorrect</span>
         <button
+          @click="handleApplyChaos"
+          class="ml-2 text-stone-400 hover:text-white transition-colors flex items-center gap-1"
+          title="Generate new chaotic invoice"
+        >
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Regenerate
+        </button>
+        <span class="text-stone-500">|</span>
+        <button
           @click="handleResetChaos"
-          class="ml-2 text-stone-400 hover:text-white transition-colors"
+          class="text-stone-400 hover:text-white transition-colors"
         >
           Reset
         </button>
@@ -686,12 +837,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import ChaosConfigModal from './components/ChaosConfigModal.vue'
+import BulkGenerateModal from './components/BulkGenerateModal.vue'
 import { useChaosMode } from './composables/useChaosMode'
+import { useInvoice, type SavedInvoice } from './composables/useInvoice'
 
-const { chaosEnabled, generateChaoticInvoice, resetChaosMode, chaosOverrides } = useChaosMode()
+const { chaosEnabled, applyChaosToInvoice, resetChaosMode, chaosOverrides, chaosConfig } = useChaosMode()
+const { invoiceHistory, initialize: initializeInvoice } = useInvoice()
 
 // Types
 interface InvoiceItem {
@@ -726,18 +880,14 @@ interface Invoice {
   terms: string
 }
 
-interface SavedInvoice {
-  id: string
-  invoice: Invoice
-  savedAt: string
-  totalAmount: number
-  customerName: string
-}
-
 interface Toast {
   id: string
   message: string
   type: 'success' | 'error'
+  action?: {
+    label: string
+    handler: () => void
+  }
 }
 
 interface Customer {
@@ -770,7 +920,6 @@ const invoice = ref<Invoice>({
   terms: ''
 })
 
-const invoiceHistory = ref<SavedInvoice[]>([])
 const customers = ref<Customer[]>([])
 const currency = ref('$')
 const language = ref('EN')
@@ -860,9 +1009,26 @@ const t = (key: string) => translations[language.value]?.[key] || translations.E
 const showHistory = ref(false)
 const showExport = ref(false)
 const showChaos = ref(false)
+const showExportAllMenu = ref(false)
+const showBulkGenerate = ref(false)
 const isExporting = ref(false)
 const exportingFormat = ref<string | null>(null)
+const justSaved = ref(false)
+const justExported = ref(false)
 const showCustomerDropdown = ref(false)
+
+// Validation - track touched fields
+const touchedFields = ref<Record<string, boolean>>({})
+
+const validateField = (field: string) => {
+  touchedFields.value[field] = true
+}
+
+const fieldErrors = computed(() => ({
+  invoiceNumber: touchedFields.value.invoiceNumber && !invoice.value.number?.trim(),
+  businessName: touchedFields.value.businessName && !invoice.value.from.businessName?.trim(),
+  customerName: touchedFields.value.customerName && !invoice.value.to.customerName?.trim(),
+}))
 const mobileView = ref<'form' | 'preview'>('form')
 const toasts = ref<Toast[]>([])
 const pdfPreviewUrl = ref<string | null>(null)
@@ -893,18 +1059,64 @@ const total = computed(() => {
 const canDownload = computed(() => invoice.value.number?.trim() && invoice.value.from.businessName?.trim() && invoice.value.to.customerName?.trim())
 
 // Methods
-const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+const showToast = (message: string, type: 'success' | 'error' = 'success', action?: { label: string; handler: () => void }) => {
   const id = uuidv4()
-  toasts.value.push({ id, message, type })
-  setTimeout(() => { toasts.value = toasts.value.filter(t => t.id !== id) }, 3000)
+  const toast: Toast = { id, message, type }
+  if (action) {
+    toast.action = {
+      label: action.label,
+      handler: () => {
+        action.handler()
+        toasts.value = toasts.value.filter(t => t.id !== id)
+      }
+    }
+  }
+  toasts.value.push(toast)
+  setTimeout(() => { toasts.value = toasts.value.filter(t => t.id !== id) }, action ? 5000 : 3000)
 }
 
-const addItem = () => {
-  invoice.value.items.push({ id: uuidv4(), description: '', quantity: 1, price: 0, tax: 0 })
+// Refs for item description inputs (for auto-focus)
+const itemDescriptionRefs = ref<Record<string, HTMLInputElement | null>>({})
+
+const setItemDescriptionRef = (id: string, el: HTMLInputElement | null) => {
+  if (el) {
+    itemDescriptionRefs.value[id] = el
+  } else {
+    delete itemDescriptionRefs.value[id]
+  }
+}
+
+const addItem = async () => {
+  const newId = uuidv4()
+  invoice.value.items.push({ id: newId, description: '', quantity: 1, price: 0, tax: 0 })
+
+  // Auto-focus the new item's description field (try desktop first, then mobile)
+  await nextTick()
+  const descInput = itemDescriptionRefs.value[newId] || itemDescriptionRefs.value['mobile-' + newId]
+  if (descInput) {
+    descInput.focus()
+  }
+}
+
+// Handle Enter key in item inputs - add new item if on last row
+const handleItemKeydown = (event: KeyboardEvent, index: number) => {
+  if (event.key === 'Enter' && index === invoice.value.items.length - 1) {
+    event.preventDefault()
+    addItem()
+  }
 }
 
 const removeItem = (index: number) => {
+  const removedItem = invoice.value.items[index]
+  const removedIndex = index
   invoice.value.items.splice(index, 1)
+
+  showToast('Item removed', 'success', {
+    label: 'Undo',
+    handler: () => {
+      invoice.value.items.splice(removedIndex, 0, removedItem)
+    }
+  })
 }
 
 const applyTaxToAll = (rate: number) => {
@@ -1023,24 +1235,40 @@ const handleClear = () => {
       terms: ''
     }
     resetChaosMode()
+    touchedFields.value = {} // Reset validation state
   }
 }
 
 const handleApplyChaos = () => {
-  const chaoticInvoice = generateChaoticInvoice()
-  // Preserve logo if exists
+  // Apply chaos to the current invoice, preserving unaffected data
+  const chaoticInvoice = applyChaosToInvoice(invoice.value)
+  // Preserve logo
   const currentLogo = invoice.value.logo
   invoice.value = chaoticInvoice
   if (currentLogo) {
     invoice.value.logo = currentLogo
   }
   showChaos.value = false
-  showToast('Chaos unleashed!')
+  showToast('Chaos applied to invoice!')
 }
 
 const handleResetChaos = () => {
-  resetChaosMode()
-  showToast('Chaos mode disabled')
+  const originalInvoice = resetChaosMode()
+  if (originalInvoice) {
+    // Preserve current logo when restoring
+    const currentLogo = invoice.value.logo
+    invoice.value = originalInvoice
+    if (currentLogo) {
+      invoice.value.logo = currentLogo
+    }
+    showToast('Invoice restored')
+  } else {
+    showToast('Chaos mode disabled')
+  }
+}
+
+const handleBulkGenerated = (count: number) => {
+  showToast(`Generated ${count} invoices`)
 }
 
 const handleSave = () => {
@@ -1054,6 +1282,10 @@ const handleSave = () => {
     customerName: invoice.value.to.customerName
   })
   localStorage.setItem(HISTORY_KEY, JSON.stringify(invoiceHistory.value))
+
+  // Show success feedback
+  justSaved.value = true
+  setTimeout(() => { justSaved.value = false }, 1500)
   showToast('Saved')
 }
 
@@ -1074,6 +1306,96 @@ const setLanguage = (lang: string) => {
 const formatDate = (dateString: string) => {
   if (!dateString) return '—'
   return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
+}
+
+// Bad scan effect helper - applies randomized gradient overlay
+const applyBadScanEffect = (pdf: any, pageWidth: number, pageHeight: number) => {
+  pdf.saveGraphicsState()
+
+  // Randomize sepia tint intensity (0.04 to 0.12)
+  const tintOpacity = 0.04 + Math.random() * 0.08
+  const tintColors = ['#d4a574', '#c4956a', '#b8a082', '#cdb891', '#a89070']
+  const tintColor = tintColors[Math.floor(Math.random() * tintColors.length)]
+  const tintGState = (pdf as any).GState({ opacity: tintOpacity })
+  pdf.setGState(tintGState)
+  pdf.setFillColor(tintColor)
+  pdf.rect(0, 0, pageWidth, pageHeight, 'F')
+
+  // Randomize gradient direction (0-7 representing different corners/sides)
+  const gradientDirection = Math.floor(Math.random() * 8)
+  const gradientSteps = 5 + Math.floor(Math.random() * 6) // 5-10 steps
+  const baseOpacity = 0.02 + Math.random() * 0.03 // 0.02-0.05
+
+  pdf.setFillColor('#1c1917')
+
+  for (let i = 0; i < gradientSteps; i++) {
+    const stepOpacity = baseOpacity * (gradientSteps - i)
+    const gState = (pdf as any).GState({ opacity: stepOpacity })
+    pdf.setGState(gState)
+
+    const ratio = (i + 1) / gradientSteps
+
+    switch (gradientDirection) {
+      case 0: // Top-left to bottom-right (diagonal)
+        pdf.rect(0, 0, pageWidth * ratio, pageHeight * ratio, 'F')
+        break
+      case 1: // Top-right to bottom-left (diagonal)
+        pdf.rect(pageWidth * (1 - ratio), 0, pageWidth * ratio, pageHeight * ratio, 'F')
+        break
+      case 2: // Bottom-left to top-right (diagonal)
+        pdf.rect(0, pageHeight * (1 - ratio), pageWidth * ratio, pageHeight * ratio, 'F')
+        break
+      case 3: // Bottom-right to top-left (diagonal)
+        pdf.rect(pageWidth * (1 - ratio), pageHeight * (1 - ratio), pageWidth * ratio, pageHeight * ratio, 'F')
+        break
+      case 4: // Top to bottom (horizontal band)
+        pdf.rect(0, 0, pageWidth, pageHeight * ratio, 'F')
+        break
+      case 5: // Bottom to top (horizontal band)
+        pdf.rect(0, pageHeight * (1 - ratio), pageWidth, pageHeight * ratio, 'F')
+        break
+      case 6: // Left to right (vertical band)
+        pdf.rect(0, 0, pageWidth * ratio, pageHeight, 'F')
+        break
+      case 7: // Right to left (vertical band)
+        pdf.rect(pageWidth * (1 - ratio), 0, pageWidth * ratio, pageHeight, 'F')
+        break
+    }
+  }
+
+  // Randomize noise spots (8-25 spots)
+  const noiseCount = 8 + Math.floor(Math.random() * 18)
+  const noiseOpacity = 0.03 + Math.random() * 0.06
+  const noiseGState = (pdf as any).GState({ opacity: noiseOpacity })
+  pdf.setGState(noiseGState)
+  const noiseColors = ['#78716c', '#57534e', '#a8a29e', '#44403c']
+  for (let i = 0; i < noiseCount; i++) {
+    pdf.setFillColor(noiseColors[Math.floor(Math.random() * noiseColors.length)])
+    const x = Math.random() * pageWidth
+    const y = Math.random() * pageHeight
+    const size = Math.random() * 4 + 0.3
+    pdf.circle(x, y, size, 'F')
+  }
+
+  // Randomize vignette (corners may be different sizes)
+  const vignetteOpacity = 0.08 + Math.random() * 0.12
+  const vignetteGState = (pdf as any).GState({ opacity: vignetteOpacity })
+  pdf.setGState(vignetteGState)
+  pdf.setFillColor('#1c1917')
+
+  // Each corner gets a random size (20-60)
+  const cornerSizes = [
+    20 + Math.random() * 40,
+    20 + Math.random() * 40,
+    20 + Math.random() * 40,
+    20 + Math.random() * 40,
+  ]
+  pdf.triangle(0, 0, cornerSizes[0], 0, 0, cornerSizes[0], 'F')
+  pdf.triangle(pageWidth, 0, pageWidth - cornerSizes[1], 0, pageWidth, cornerSizes[1], 'F')
+  pdf.triangle(0, pageHeight, cornerSizes[2], pageHeight, 0, pageHeight - cornerSizes[2], 'F')
+  pdf.triangle(pageWidth, pageHeight, pageWidth - cornerSizes[3], pageHeight, pageWidth, pageHeight - cornerSizes[3], 'F')
+
+  pdf.restoreGraphicsState()
 }
 
 // PDF Generation
@@ -1290,6 +1612,11 @@ const generatePreview = async () => {
     // Add footer
     addFooter()
 
+    // Add bad scan effect if enabled
+    if (chaosEnabled.value && chaosConfig.value.enableBadScanEffect) {
+      applyBadScanEffect(pdf, pageWidth, pageHeight)
+    }
+
     if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value.split('#')[0])
     pdfPreviewUrl.value = URL.createObjectURL(pdf.output('blob')) + `#${invoice.value.number || 'invoice'}.pdf`
   } catch (e) {
@@ -1302,6 +1629,256 @@ const generatePreview = async () => {
 const debouncedPreview = () => {
   if (previewDebounce) clearTimeout(previewDebounce)
   previewDebounce = setTimeout(generatePreview, 400)
+}
+
+// Bulk export state
+const isBulkExporting = ref(false)
+const bulkExportProgress = ref({ current: 0, total: 0 })
+
+// Generate PDF blob for any invoice (reusable for bulk export)
+const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
+  const { default: jsPDF } = await import('jspdf')
+  const pdf = new jsPDF('p', 'mm', 'a4')
+
+  // Calculate totals for this invoice
+  const calcSubtotal = invoiceData.items.reduce((sum, item) => sum + item.quantity * item.price, 0)
+  const calcTotalTax = invoiceData.items.reduce((sum, item) => {
+    const itemSubtotal = item.quantity * item.price
+    return sum + (itemSubtotal * item.tax) / 100
+  }, 0)
+  const calcTotal = calcSubtotal + calcTotalTax
+
+  const pageWidth = 210
+  const pageHeight = 297
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
+
+  // Set PDF document properties
+  const invoiceTitle = invoiceData.number || 'Invoice'
+  pdf.setProperties({
+    title: invoiceTitle,
+    subject: `Invoice ${invoiceTitle}`,
+    creator: 'Numerand Invoice Generator',
+  })
+
+  // Add watermark
+  pdf.saveGraphicsState()
+  const textGState = (pdf as any).GState({ opacity: 0.08 })
+  pdf.setGState(textGState)
+  pdf.setFontSize(48)
+  pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor('#78716c')
+  const wmText = 'SAMPLE INVOICE'
+  for (let i = -1; i <= 1; i++) {
+    pdf.text(wmText, pageWidth / 2, (pageHeight / 2) + (i * 80), { angle: -35, align: 'center' })
+  }
+  pdf.restoreGraphicsState()
+
+  // Footer function
+  const addFooter = () => {
+    const footerY = pageHeight - 12
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setTextColor('#a8a29e')
+    const text1 = t('generatedWith')
+    const text2 = `${t('by')} Numerand`
+    const heartSize = 3
+    const spacing = 1.8
+    const text1Width = pdf.getTextWidth(text1)
+    const text2Width = pdf.getTextWidth(text2)
+    const totalWidth = text1Width + heartSize + text2Width + spacing * 2
+    let startX = (pageWidth - totalWidth) / 2
+    pdf.text(text1, startX, footerY)
+    startX += text1Width + spacing
+    // Draw heart
+    pdf.setFillColor('#ef4444')
+    const s = heartSize
+    pdf.ellipse(startX + s / 2 - s * 0.25, footerY - 1 - s * 0.15, s * 0.28, s * 0.25, 'F')
+    pdf.ellipse(startX + s / 2 + s * 0.25, footerY - 1 - s * 0.15, s * 0.28, s * 0.25, 'F')
+    pdf.triangle(startX + s / 2 - s * 0.5, footerY - 1, startX + s / 2 + s * 0.5, footerY - 1, startX + s / 2, footerY - 1 + s * 0.55, 'F')
+    startX += heartSize + spacing
+    pdf.setTextColor('#a8a29e')
+    pdf.text(text2, startX, footerY)
+  }
+
+  const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
+    pdf.setFontSize(size)
+    pdf.setFont('helvetica', style)
+    pdf.setTextColor(color)
+    let finalX = x
+    if (align === 'right') finalX = x - pdf.getTextWidth(text)
+    pdf.text(text, finalX, yPos)
+  }
+
+  // Header
+  y += 5
+  if (invoiceData.logo) { try { pdf.addImage(invoiceData.logo, 'JPEG', margin, y, 18, 18) } catch {} }
+  addText(t('invoice'), invoiceData.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
+  addText(invoiceData.number || 'Draft', invoiceData.logo ? margin + 25 : margin, y + 16, 10, 'normal', 'left', '#78716c')
+  addText(`${t('date')}: ${formatDate(invoiceData.date)}`, pageWidth - margin, y + 8, 9, 'normal', 'right', '#78716c')
+  addText(`${t('due')}: ${formatDate(invoiceData.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+  y += 35
+
+  // From/To
+  addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
+  addText(t('to'), pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
+  y += 6
+  if (invoiceData.from.businessName) { addText(invoiceData.from.businessName, margin, y, 10, 'bold', 'left', '#1c1917'); y += 5 }
+  let fromY = y
+  if (invoiceData.from.email) { addText(invoiceData.from.email, margin, y, 9); y += 4 }
+  if (invoiceData.from.address) { addText(invoiceData.from.address, margin, y, 9); y += 4 }
+  if (invoiceData.from.phone) { addText(invoiceData.from.phone, margin, y, 9); y += 4 }
+  if (invoiceData.from.taxId) { addText(`${t('taxId')}: ${invoiceData.from.taxId}`, margin, y, 8, 'normal', 'left', '#a8a29e'); y += 4 }
+
+  let toY = fromY - 5
+  if (invoiceData.to.customerName) { addText(invoiceData.to.customerName, pageWidth / 2 + 10, toY, 10, 'bold', 'left', '#1c1917'); toY += 5 }
+  if (invoiceData.to.email) { addText(invoiceData.to.email, pageWidth / 2 + 10, toY, 9); toY += 4 }
+  if (invoiceData.to.address) { addText(invoiceData.to.address, pageWidth / 2 + 10, toY, 9); toY += 4 }
+  if (invoiceData.to.phone) { addText(invoiceData.to.phone, pageWidth / 2 + 10, toY, 9); toY += 4 }
+  if (invoiceData.to.taxId) { addText(`${t('taxId')}: ${invoiceData.to.taxId}`, pageWidth / 2 + 10, toY, 8, 'normal', 'left', '#a8a29e') }
+
+  // Items table
+  y = Math.max(y, toY) + 15
+  pdf.setDrawColor('#e7e5e4')
+  pdf.setLineWidth(0.3)
+  pdf.line(margin, y, pageWidth - margin, y)
+  y += 6
+  addText(t('description'), margin, y, 8, 'bold', 'left', '#a8a29e')
+  addText(t('qty'), pageWidth - margin - 60, y, 8, 'bold', 'right', '#a8a29e')
+  addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
+  addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+  y += 3
+  pdf.line(margin, y, pageWidth - margin, y)
+  y += 6
+
+  invoiceData.items.forEach(item => {
+    const desc = item.description?.length > 40 ? item.description.substring(0, 37) + '...' : (item.description || '—')
+    addText(desc, margin, y, 9, 'normal', 'left', '#1c1917')
+    addText(String(item.quantity), pageWidth - margin - 60, y, 9, 'normal', 'right', '#57534e')
+    addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
+    addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+    y += 7
+  })
+
+  // Totals
+  y += 5
+  pdf.line(margin, y, pageWidth - margin, y)
+  y += 12
+  addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+  addText(`${currency.value}${calcSubtotal.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+  y += 6
+  addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+  addText(`${currency.value}${calcTotalTax.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+  y += 8
+  pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
+  y += 6
+  addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
+  addText(`${currency.value}${calcTotal.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+
+  // Notes and Terms
+  if (invoiceData.notes || invoiceData.terms) {
+    y += 20
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 10
+    if (invoiceData.notes) {
+      addText(t('notes'), margin, y, 8, 'bold', 'left', '#a8a29e')
+      y += 6
+      const notesLines = pdf.splitTextToSize(invoiceData.notes, contentWidth)
+      notesLines.forEach((line: string) => { addText(line, margin, y, 9, 'normal', 'left', '#57534e'); y += 5 })
+      y += 5
+    }
+    if (invoiceData.terms) {
+      addText(t('paymentTerms'), margin, y, 8, 'bold', 'left', '#a8a29e')
+      y += 6
+      const termsLines = pdf.splitTextToSize(invoiceData.terms, contentWidth)
+      termsLines.forEach((line: string) => { addText(line, margin, y, 9, 'normal', 'left', '#57534e'); y += 5 })
+    }
+  }
+
+  addFooter()
+
+  // Return as blob
+  return pdf.output('blob')
+}
+
+// Export all history
+const handleExportAll = async (format: 'zip' | 'json' | 'csv') => {
+  if (invoiceHistory.value.length === 0) {
+    showToast('No invoices to export', 'error')
+    return
+  }
+
+  isBulkExporting.value = true
+  bulkExportProgress.value = { current: 0, total: invoiceHistory.value.length }
+
+  try {
+    if (format === 'zip') {
+      const { default: JSZip } = await import('jszip')
+      const zip = new JSZip()
+
+      for (let i = 0; i < invoiceHistory.value.length; i++) {
+        const savedInvoice = invoiceHistory.value[i]
+        bulkExportProgress.value.current = i + 1
+
+        const pdfBlob = await generatePDFBlob(savedInvoice.invoice)
+        const filename = `${savedInvoice.invoice.number || `invoice-${i + 1}`}.pdf`
+        zip.file(filename, pdfBlob)
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(zipBlob)
+      a.download = `invoices-${new Date().toISOString().split('T')[0]}.zip`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } else if (format === 'json') {
+      const exportData = invoiceHistory.value.map(saved => ({
+        ...saved,
+        invoice: { ...saved.invoice, logo: undefined } // Exclude logos for smaller file
+      }))
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `invoices-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } else if (format === 'csv') {
+      const headers = ['Invoice Number', 'Date', 'Due Date', 'From', 'To', 'Items', 'Subtotal', 'Tax', 'Total', 'Saved At']
+      const rows = invoiceHistory.value.map(saved => {
+        const inv = saved.invoice
+        const subtotal = inv.items.reduce((sum, item) => sum + item.quantity * item.price, 0)
+        const tax = inv.items.reduce((sum, item) => sum + (item.quantity * item.price * item.tax / 100), 0)
+        return [
+          inv.number,
+          inv.date,
+          inv.dueDate,
+          inv.from.businessName,
+          inv.to.customerName,
+          inv.items.length,
+          subtotal.toFixed(2),
+          tax.toFixed(2),
+          (subtotal + tax).toFixed(2),
+          saved.savedAt
+        ]
+      })
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `invoices-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    }
+
+    showToast(`Exported ${invoiceHistory.value.length} invoices`)
+  } catch (e) {
+    console.error(e)
+    showToast('Export failed', 'error')
+  } finally {
+    isBulkExporting.value = false
+    bulkExportProgress.value = { current: 0, total: 0 }
+  }
 }
 
 // Export handlers
@@ -1491,6 +2068,11 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
       // Add footer
       addFooter()
 
+      // Add bad scan effect if enabled
+      if (chaosEnabled.value && chaosConfig.value.enableBadScanEffect) {
+        applyBadScanEffect(pdf, pageWidth, pageHeight)
+      }
+
       pdf.save(`${invoice.value.number || 'invoice'}.pdf`)
     } else if (format === 'excel') {
       const { default: XLSX } = await import('xlsx')
@@ -1536,6 +2118,11 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
     }
     showToast('Exported')
     showExport.value = false
+
+    // Show success feedback
+    justExported.value = true
+    setTimeout(() => { justExported.value = false }, 1500)
+    showToast('Exported successfully')
   } catch (e) {
     console.error(e)
     showToast('Export failed', 'error')
@@ -1554,11 +2141,11 @@ watch(invoice, (val) => {
 
 onMounted(async () => {
   try {
+    // Initialize shared state from useInvoice (loads history from localStorage)
+    initializeInvoice()
+
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) invoice.value = { ...invoice.value, ...JSON.parse(saved) }
-
-    const history = localStorage.getItem(HISTORY_KEY)
-    if (history) invoiceHistory.value = JSON.parse(history)
 
     const savedCustomers = localStorage.getItem(CUSTOMERS_KEY)
     if (savedCustomers) customers.value = JSON.parse(savedCustomers)
@@ -1608,18 +2195,20 @@ textarea:focus-visible {
   outline: none !important;
 }
 
-/* Subtle focus indicator for underline inputs */
+/* Focus indicator for underline inputs */
 input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="tel"]:focus,
 input[type="date"]:focus,
 input[type="number"]:focus {
-  background-color: rgba(245, 245, 244, 0.5);
+  background-color: rgba(245, 245, 244, 0.8);
+  box-shadow: inset 0 -2px 0 0 #78716c;
 }
 
 /* Textarea focus */
 textarea:focus {
   border-color: #1c1917 !important;
+  background-color: rgba(245, 245, 244, 0.5);
 }
 
 /* Select focus */
@@ -1715,6 +2304,21 @@ a:focus-visible {
   cursor: not-allowed;
 }
 
+/* Success state for buttons */
+.btn-success {
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #166534;
+  background-color: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 0.25rem;
+  transition: all 150ms ease;
+}
+
 /* Ghost - minimal text buttons (History, Clear) */
 .btn-ghost {
   align-items: center;
@@ -1783,4 +2387,11 @@ input[type="number"] { -moz-appearance: textfield; }
 .toast-leave-active { transition: all 0.15s ease-in; }
 .toast-enter-from { opacity: 0; transform: translateY(8px); }
 .toast-leave-to { opacity: 0; transform: translateY(-8px); }
+
+/* Item list animations */
+.item-list-enter-active { transition: all 0.3s ease-out; }
+.item-list-leave-active { transition: all 0.2s ease-in; position: absolute; width: 100%; }
+.item-list-enter-from { opacity: 0; transform: translateY(-10px); }
+.item-list-leave-to { opacity: 0; transform: translateX(-20px); }
+.item-list-move { transition: transform 0.3s ease; }
 </style>

@@ -6,7 +6,7 @@
         class="fixed inset-0 bg-black/20 z-50 flex items-center justify-center"
         @click.self="$emit('close')"
       >
-        <div class="bg-white shadow-xl w-80">
+        <div class="bg-white shadow-xl w-96">
           <!-- Header -->
           <div class="p-4 border-b border-stone-200 flex items-center justify-between">
             <span class="text-sm font-medium">Chaos Mode</span>
@@ -37,23 +37,45 @@
             </div>
           </div>
 
-          <!-- Features -->
-          <div class="p-2 max-h-64 overflow-y-auto">
-            <label
-              v-for="feature in features"
-              :key="feature.key"
-              class="flex items-center gap-3 px-2 py-2 hover:bg-stone-50 cursor-pointer transition-colors"
+          <!-- Features section header -->
+          <div class="px-4 pt-3 pb-1 flex items-center justify-between">
+            <div class="text-[10px] uppercase tracking-wider text-stone-400">Features</div>
+            <button
+              @click="toggleAll"
+              class="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
             >
-              <input
-                type="checkbox"
-                v-model="chaosConfig[feature.key]"
-                class="w-4 h-4 border-stone-300 text-stone-900 focus:ring-stone-500 focus:ring-offset-0"
-              />
-              <div class="flex-1 min-w-0">
-                <span class="text-sm text-stone-700 block">{{ feature.label }}</span>
-                <span class="text-[10px] text-stone-400 block truncate">{{ feature.description }}</span>
-              </div>
-            </label>
+              {{ allSelected ? 'Deselect all' : 'Select all' }}
+            </button>
+          </div>
+
+          <!-- Features list with scroll indicator -->
+          <div class="relative">
+            <div
+              ref="scrollContainer"
+              @scroll="updateScrollState"
+              class="px-2 pb-2 max-h-96 overflow-y-auto"
+            >
+              <label
+                v-for="feature in features"
+                :key="feature.key"
+                class="flex items-center gap-3 px-2 py-2 hover:bg-stone-50 cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  v-model="chaosConfig[feature.key]"
+                  class="w-4 h-4 border-stone-300 text-stone-900 focus:ring-stone-500 focus:ring-offset-0"
+                />
+                <div class="flex-1 min-w-0">
+                  <span class="text-sm text-stone-700 block">{{ feature.label }}</span>
+                  <span class="text-[10px] text-stone-400 block truncate">{{ feature.description }}</span>
+                </div>
+              </label>
+            </div>
+            <!-- Scroll fade indicator -->
+            <div
+              v-if="canScrollDown"
+              class="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none"
+            />
           </div>
 
           <!-- Footer -->
@@ -78,9 +100,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useChaosMode, type ChaosConfig, type ChaosIntensity } from '../composables/useChaosMode'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
 }>()
 
@@ -90,6 +113,27 @@ defineEmits<{
 }>()
 
 const { chaosConfig } = useChaosMode()
+
+const scrollContainer = ref<HTMLElement | null>(null)
+const canScrollDown = ref(false)
+
+const updateScrollState = () => {
+  if (scrollContainer.value) {
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainer.value
+    canScrollDown.value = scrollTop + clientHeight < scrollHeight - 10
+  }
+}
+
+watch(() => props.isOpen, async (isOpen) => {
+  if (isOpen) {
+    await nextTick()
+    updateScrollState()
+  }
+})
+
+onMounted(() => {
+  updateScrollState()
+})
 
 const intensityLevels: { value: ChaosIntensity; label: string }[] = [
   { value: 'mild', label: 'Mild' },
@@ -105,7 +149,17 @@ const features: { key: keyof Omit<ChaosConfig, 'intensity'>; label: string; desc
   { key: 'enableDateChaos', label: 'Date Chaos', description: 'Due dates before invoice dates' },
   { key: 'enableInvalidEmails', label: 'Invalid Emails', description: 'Broken email formats' },
   { key: 'enableCrazyInvoiceNumbers', label: 'Crazy Invoice Numbers', description: 'SQL injection, special chars' },
+  { key: 'enableBadScanEffect', label: 'Bad Scan Effect', description: 'Randomized gradient overlay on PDF' },
 ]
+
+const allSelected = computed(() => features.every(f => chaosConfig.value[f.key]))
+
+const toggleAll = () => {
+  const newValue = !allSelected.value
+  features.forEach(f => {
+    chaosConfig.value[f.key] = newValue
+  })
+}
 </script>
 
 <style scoped>

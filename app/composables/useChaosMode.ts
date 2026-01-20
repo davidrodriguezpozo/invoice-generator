@@ -13,6 +13,7 @@ export interface ChaosConfig {
   enableDateChaos: boolean
   enableInvalidEmails: boolean
   enableCrazyInvoiceNumbers: boolean
+  enableBadScanEffect: boolean
 }
 
 // Singleton state
@@ -26,6 +27,7 @@ const chaosConfig = ref<ChaosConfig>({
   enableDateChaos: true,
   enableInvalidEmails: true,
   enableCrazyInvoiceNumbers: true,
+  enableBadScanEffect: true,
 })
 
 // Override values for totals (to make them not match)
@@ -34,6 +36,9 @@ const chaosOverrides = ref<{
   totalTax?: number
   total?: number
 } | null>(null)
+
+// Store original invoice before chaos is applied (for reset)
+const originalInvoice = ref<Invoice | null>(null)
 
 // Emoji pools
 const EMOJIS = {
@@ -400,6 +405,97 @@ export function useChaosMode() {
     }
   }
 
+  // Apply chaos to an existing invoice (modifies only enabled chaos features)
+  const applyChaosToInvoice = (invoice: Invoice): Invoice => {
+    const {
+      enableEmojiInjection,
+      enableCrazyInvoiceNumbers,
+      enableDateChaos,
+      enableInvalidEmails,
+      enableTaxChaos,
+      enableNegativeAmounts,
+      enableTotalMismatch,
+    } = chaosConfig.value
+
+    // Store original invoice before first chaos application (for reset)
+    if (!chaosEnabled.value) {
+      originalInvoice.value = JSON.parse(JSON.stringify(invoice))
+    }
+
+    // Deep clone the invoice to avoid mutating the original
+    const chaosInvoice: Invoice = JSON.parse(JSON.stringify(invoice))
+
+    // Apply date chaos
+    if (enableDateChaos) {
+      const dates = generateChaoticDates()
+      chaosInvoice.date = dates.date
+      chaosInvoice.dueDate = dates.dueDate
+    }
+
+    // Apply crazy invoice numbers
+    if (enableCrazyInvoiceNumbers) {
+      const invoiceNumbers = enableEmojiInjection
+        ? [...CLEAN_INVOICE_NUMBERS, ...EMOJI_INVOICE_NUMBERS]
+        : CLEAN_INVOICE_NUMBERS
+      chaosInvoice.number = randomFromArray(invoiceNumbers)
+    }
+
+    // Apply invalid emails
+    if (enableInvalidEmails) {
+      chaosInvoice.from.email = generateChaoticEmail()
+      chaosInvoice.to.email = generateChaoticEmail()
+    }
+
+    // Apply emoji injection to text fields
+    if (enableEmojiInjection) {
+      if (chaosInvoice.from.businessName) {
+        chaosInvoice.from.businessName = injectEmojis(chaosInvoice.from.businessName)
+      }
+      if (chaosInvoice.to.customerName) {
+        chaosInvoice.to.customerName = injectEmojis(chaosInvoice.to.customerName)
+      }
+      if (chaosInvoice.notes) {
+        chaosInvoice.notes = injectEmojis(chaosInvoice.notes)
+      }
+      if (chaosInvoice.terms) {
+        chaosInvoice.terms = injectEmojis(chaosInvoice.terms)
+      }
+      // Inject emojis into item descriptions
+      chaosInvoice.items.forEach(item => {
+        if (item.description) {
+          item.description = injectEmojis(item.description)
+        }
+      })
+    }
+
+    // Apply tax chaos to existing items
+    if (enableTaxChaos) {
+      chaosInvoice.items.forEach(item => {
+        item.tax = generateChaoticTax()
+      })
+    }
+
+    // Apply negative amounts to existing items
+    if (enableNegativeAmounts) {
+      chaosInvoice.items.forEach(item => {
+        const { quantity, price } = generateChaoticAmount()
+        item.quantity = quantity
+        item.price = price
+      })
+    }
+
+    // Generate mismatched totals based on items
+    if (enableTotalMismatch) {
+      generateMismatchedTotals(chaosInvoice.items)
+    } else {
+      chaosOverrides.value = null
+    }
+
+    chaosEnabled.value = true
+    return chaosInvoice
+  }
+
+  // Generate a completely new chaotic invoice (legacy behavior)
   const generateChaoticInvoice = (): Invoice => {
     const {
       enableEmojiInjection,
@@ -462,9 +558,12 @@ export function useChaosMode() {
     return invoice
   }
 
-  const resetChaosMode = () => {
+  const resetChaosMode = (): Invoice | null => {
     chaosEnabled.value = false
     chaosOverrides.value = null
+    const original = originalInvoice.value
+    originalInvoice.value = null
+    return original
   }
 
   const setIntensity = (intensity: ChaosIntensity) => {
@@ -482,6 +581,7 @@ export function useChaosMode() {
     chaosOverrides,
 
     // Methods
+    applyChaosToInvoice,
     generateChaoticInvoice,
     resetChaosMode,
     setIntensity,
