@@ -15,6 +15,19 @@
 
       <div class="flex items-center gap-1 sm:gap-3">
         <select
+          :value="invoice.documentType"
+          @change="handleDocumentTypeChange(($event.target as HTMLSelectElement).value as DocumentType)"
+          class="text-xs text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer hover:text-stone-900 transition-colors pr-4 sm:pr-6"
+        >
+          <option value="invoice">Invoice</option>
+          <option value="receipt">Receipt</option>
+          <option value="delivery_note">Delivery Note</option>
+          <option value="ticket">Ticket</option>
+        </select>
+
+        <div class="hidden sm:block w-px h-4 bg-stone-200"></div>
+
+        <select
           v-model="currency"
           class="text-xs text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer hover:text-stone-900 transition-colors pr-4 sm:pr-6"
         >
@@ -169,13 +182,13 @@
           </div>
 
           <!-- Invoice Details -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div :class="['grid grid-cols-1 gap-3 sm:gap-4', currentDocConfig.hasDueDate ? 'sm:grid-cols-3' : 'sm:grid-cols-2']">
             <div>
               <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number *</label>
               <input
                 v-model="invoice.number"
                 type="text"
-                placeholder="INV-001"
+                :placeholder="currentDocConfig.prefix + '001'"
                 @blur="validateField('invoiceNumber')"
                 :class="[
                   'w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1 transition-colors',
@@ -192,13 +205,30 @@
                 class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors"
               />
             </div>
-            <div>
+            <div v-if="currentDocConfig.hasDueDate">
               <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Due</label>
               <input
                 v-model="invoice.dueDate"
                 type="date"
                 class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors"
               />
+            </div>
+          </div>
+
+          <!-- Payment Method (Receipts) -->
+          <div v-if="currentDocConfig.hasPaymentMethod" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Payment Method</label>
+              <select
+                v-model="invoice.paymentMethod"
+                class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors bg-transparent"
+              >
+                <option value="">Select...</option>
+                <option value="cash">Cash</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Check</option>
+              </select>
             </div>
           </div>
 
@@ -365,12 +395,14 @@
 
             <div v-else class="space-y-0">
               <!-- Desktop Header -->
-              <div class="hidden sm:grid grid-cols-12 gap-2 pb-2 border-b border-stone-200 text-[10px] uppercase tracking-wider text-stone-400">
-                <div class="col-span-5">Description</div>
+              <div :class="['hidden sm:grid gap-2 pb-2 border-b border-stone-200 text-[10px] uppercase tracking-wider text-stone-400', currentDocConfig.hasPrices ? 'grid-cols-12' : 'grid-cols-12']">
+                <div :class="currentDocConfig.hasPrices ? 'col-span-5' : 'col-span-10'">Description</div>
                 <div class="col-span-1 text-center">Qty</div>
-                <div class="col-span-2 text-right">Price</div>
-                <div class="col-span-1 text-center">Tax %</div>
-                <div class="col-span-2 text-right">Total</div>
+                <template v-if="currentDocConfig.hasPrices">
+                  <div class="col-span-2 text-right">Price</div>
+                  <div class="col-span-1 text-center">Tax %</div>
+                  <div class="col-span-2 text-right">Total</div>
+                </template>
                 <div class="col-span-1"></div>
               </div>
 
@@ -381,7 +413,7 @@
                   :key="item.id"
                   class="grid grid-cols-12 gap-2 py-3 border-b border-stone-100 group items-center hover:bg-stone-50/50 transition-colors -mx-2 px-2"
                 >
-                <div class="col-span-5">
+                <div :class="currentDocConfig.hasPrices ? 'col-span-5' : 'col-span-10'">
                   <input
                     :ref="(el) => setItemDescriptionRef(item.id, el as HTMLInputElement)"
                     v-model="item.description"
@@ -401,30 +433,32 @@
                     class="w-full text-sm text-stone-900 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
                   />
                 </div>
-                <div class="col-span-2">
-                  <input
-                    v-model.number="item.price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    @keydown="handleItemKeydown($event, index)"
-                    class="w-full text-sm text-stone-900 text-right border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
-                  />
-                </div>
-                <div class="col-span-1">
-                  <input
-                    v-model.number="item.tax"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.5"
-                    @keydown="handleItemKeydown($event, index)"
-                    class="w-full text-sm text-stone-500 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
-                  />
-                </div>
-                <div class="col-span-2 text-sm text-stone-900 text-right tabular-nums font-medium">
-                  {{ currency }}{{ ((item.quantity * item.price) * (1 + item.tax / 100)).toFixed(2) }}
-                </div>
+                <template v-if="currentDocConfig.hasPrices">
+                  <div class="col-span-2">
+                    <input
+                      v-model.number="item.price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      @keydown="handleItemKeydown($event, index)"
+                      class="w-full text-sm text-stone-900 text-right border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
+                    />
+                  </div>
+                  <div class="col-span-1">
+                    <input
+                      v-model.number="item.tax"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      @keydown="handleItemKeydown($event, index)"
+                      class="w-full text-sm text-stone-500 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"
+                    />
+                  </div>
+                  <div class="col-span-2 text-sm text-stone-900 text-right tabular-nums font-medium">
+                    {{ currency }}{{ ((item.quantity * item.price) * (1 + item.tax / 100)).toFixed(2) }}
+                  </div>
+                </template>
                 <div class="col-span-1 text-right">
                   <button
                     @click="removeItem(index)"
@@ -465,7 +499,7 @@
                       </svg>
                     </button>
                   </div>
-                  <div class="grid grid-cols-4 gap-3">
+                  <div :class="['grid gap-3', currentDocConfig.hasPrices ? 'grid-cols-4' : 'grid-cols-1']">
                     <div>
                       <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Qty</label>
                       <input
@@ -477,41 +511,43 @@
                         class="w-full text-sm text-stone-900 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
                       />
                     </div>
-                    <div>
-                      <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Price</label>
-                      <input
-                        v-model.number="item.price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        @keydown="handleItemKeydown($event, index)"
-                        class="w-full text-sm text-stone-900 border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
-                      />
-                    </div>
-                    <div>
-                      <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Tax %</label>
-                      <input
-                        v-model.number="item.tax"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.5"
-                        @keydown="handleItemKeydown($event, index)"
-                        class="w-full text-sm text-stone-500 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
-                      />
-                    </div>
-                    <div>
-                      <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Total</label>
-                      <div class="text-sm text-stone-900 font-medium tabular-nums py-2 text-right min-h-[44px] flex items-center justify-end">
-                        {{ currency }}{{ ((item.quantity * item.price) * (1 + item.tax / 100)).toFixed(2) }}
+                    <template v-if="currentDocConfig.hasPrices">
+                      <div>
+                        <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Price</label>
+                        <input
+                          v-model.number="item.price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          @keydown="handleItemKeydown($event, index)"
+                          class="w-full text-sm text-stone-900 border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
+                        />
                       </div>
-                    </div>
+                      <div>
+                        <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Tax %</label>
+                        <input
+                          v-model.number="item.tax"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
+                          @keydown="handleItemKeydown($event, index)"
+                          class="w-full text-sm text-stone-500 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Total</label>
+                        <div class="text-sm text-stone-900 font-medium tabular-nums py-2 text-right min-h-[44px] flex items-center justify-end">
+                          {{ currency }}{{ ((item.quantity * item.price) * (1 + item.tax / 100)).toFixed(2) }}
+                        </div>
+                      </div>
+                    </template>
                   </div>
                 </div>
               </TransitionGroup>
 
               <!-- Tax Presets -->
-              <div class="pt-3 pb-2 flex flex-wrap items-center gap-2">
+              <div v-if="currentDocConfig.hasPrices" class="pt-3 pb-2 flex flex-wrap items-center gap-2">
                 <span class="text-[10px] uppercase tracking-wider text-stone-400">Quick tax:</span>
                 <div class="flex flex-wrap gap-1">
                   <button
@@ -526,7 +562,7 @@
               </div>
 
               <!-- Totals -->
-              <div class="pt-4 space-y-2 border-t border-stone-200">
+              <div v-if="currentDocConfig.hasTotals" class="pt-4 space-y-2 border-t border-stone-200">
                 <div class="flex justify-between text-sm">
                   <span class="text-stone-400">Subtotal</span>
                   <span class="tabular-nums">{{ currency }}{{ subtotal.toFixed(2) }}</span>
@@ -554,7 +590,7 @@
                 class="w-full text-sm text-stone-900 placeholder-stone-300 bg-transparent border-0 border-b-2 border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 resize-none transition-colors"
               ></textarea>
             </div>
-            <div>
+            <div v-if="currentDocConfig.hasTerms">
               <label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Payment Terms</label>
               <textarea
                 v-model="invoice.terms"
@@ -694,7 +730,13 @@
                 @click="loadInvoice(saved); showHistory = false"
               >
                 <div class="flex items-center justify-between">
-                  <span class="text-sm font-medium text-stone-900">{{ saved.invoice.number }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm font-medium text-stone-900">{{ saved.invoice.number }}</span>
+                    <span
+                      v-if="(saved.documentType || saved.invoice?.documentType || 'invoice') !== 'invoice'"
+                      class="text-[9px] font-medium px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded uppercase"
+                    >{{ ({ invoice: '', receipt: 'REC', delivery_note: 'DN', ticket: 'TKT' } as Record<string, string>)[saved.documentType || saved.invoice?.documentType || 'invoice'] }}</span>
+                  </div>
                   <span class="text-xs text-stone-500 tabular-nums">{{ currency }}{{ (saved.totalAmount ?? 0).toFixed(2) }}</span>
                 </div>
                 <div class="text-xs text-stone-400 mt-1">{{ saved.customerName }}</div>
@@ -842,7 +884,7 @@ import { v4 as uuidv4 } from 'uuid'
 import ChaosConfigModal from './components/ChaosConfigModal.vue'
 import BulkGenerateModal from './components/BulkGenerateModal.vue'
 import { useChaosMode } from './composables/useChaosMode'
-import { useInvoice, type SavedInvoice } from './composables/useInvoice'
+import { useInvoice, type SavedInvoice, type DocumentType, DOCUMENT_TYPE_CONFIG } from './composables/useInvoice'
 
 const { chaosEnabled, applyChaosToInvoice, resetChaosMode, chaosOverrides, chaosConfig } = useChaosMode()
 const { invoiceHistory, initialize: initializeInvoice } = useInvoice()
@@ -860,6 +902,8 @@ interface Invoice {
   number: string
   date: string
   dueDate: string
+  documentType: DocumentType
+  paymentMethod: string
   logo: string | null
   from: {
     businessName: string
@@ -912,6 +956,8 @@ const invoice = ref<Invoice>({
   number: '',
   date: new Date().toISOString().split('T')[0],
   dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  documentType: 'invoice',
+  paymentMethod: '',
   logo: null,
   from: { businessName: '', taxId: '', address: '', email: '', phone: '' },
   to: { customerName: '', taxId: '', address: '', email: '', phone: '' },
@@ -928,6 +974,10 @@ const language = ref('EN')
 const translations: Record<string, Record<string, string>> = {
   EN: {
     invoice: 'INVOICE',
+    receipt: 'RECEIPT',
+    deliveryNote: 'DELIVERY NOTE',
+    ticket: 'TICKET',
+    paymentMethod: 'Payment Method',
     from: 'FROM',
     to: 'TO',
     description: 'DESCRIPTION',
@@ -947,6 +997,10 @@ const translations: Record<string, Record<string, string>> = {
   },
   ES: {
     invoice: 'FACTURA',
+    receipt: 'RECIBO',
+    deliveryNote: 'ALBARÁN',
+    ticket: 'TICKET',
+    paymentMethod: 'Método de Pago',
     from: 'DE',
     to: 'PARA',
     description: 'DESCRIPCIÓN',
@@ -966,6 +1020,10 @@ const translations: Record<string, Record<string, string>> = {
   },
   FR: {
     invoice: 'FACTURE',
+    receipt: 'REÇU',
+    deliveryNote: 'BON DE LIVRAISON',
+    ticket: 'TICKET',
+    paymentMethod: 'Mode de Paiement',
     from: 'DE',
     to: 'À',
     description: 'DESCRIPTION',
@@ -985,6 +1043,10 @@ const translations: Record<string, Record<string, string>> = {
   },
   DE: {
     invoice: 'RECHNUNG',
+    receipt: 'QUITTUNG',
+    deliveryNote: 'LIEFERSCHEIN',
+    ticket: 'TICKET',
+    paymentMethod: 'Zahlungsart',
     from: 'VON',
     to: 'AN',
     description: 'BESCHREIBUNG',
@@ -1077,6 +1139,37 @@ const total = computed(() => {
   return subtotal.value + totalTax.value
 })
 const canDownload = computed(() => invoice.value.number?.trim() && invoice.value.from.businessName?.trim() && invoice.value.to.customerName?.trim())
+
+// Document type config
+const currentDocConfig = computed(() => DOCUMENT_TYPE_CONFIG[invoice.value.documentType])
+
+const documentTypeTitle = (docType: DocumentType): string => {
+  const titleMap: Record<DocumentType, string> = {
+    invoice: 'invoice',
+    receipt: 'receipt',
+    delivery_note: 'deliveryNote',
+    ticket: 'ticket',
+  }
+  return t(titleMap[docType])
+}
+
+const handleDocumentTypeChange = (newType: DocumentType) => {
+  const oldConfig = DOCUMENT_TYPE_CONFIG[invoice.value.documentType]
+  const newConfig = DOCUMENT_TYPE_CONFIG[newType]
+
+  // Update number prefix if it starts with the old prefix
+  const num = invoice.value.number
+  if (num.startsWith(oldConfig.prefix)) {
+    invoice.value.number = newConfig.prefix + num.slice(oldConfig.prefix.length)
+  }
+
+  invoice.value.documentType = newType
+
+  // Clear payment method if new type doesn't support it
+  if (!newConfig.hasPaymentMethod) {
+    invoice.value.paymentMethod = ''
+  }
+}
 
 // Methods
 const showToast = (message: string, type: 'success' | 'error' = 'success', action?: { label: string; handler: () => void }) => {
@@ -1243,10 +1336,13 @@ const deleteCustomer = (id: string) => {
 
 const handleClear = () => {
   if (confirm('Clear all data?')) {
+    const currentDocType = invoice.value.documentType
     invoice.value = {
       number: '',
       date: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      documentType: currentDocType,
+      paymentMethod: '',
       logo: localStorage.getItem(LOGO_KEY),
       from: { businessName: '', taxId: '', address: '', email: '', phone: '' },
       to: { customerName: '', taxId: '', address: '', email: '', phone: '' },
@@ -1299,7 +1395,8 @@ const handleSave = () => {
     invoice: JSON.parse(JSON.stringify(invoice.value)),
     savedAt: new Date().toISOString(),
     totalAmount: total.value,
-    customerName: invoice.value.to.customerName
+    customerName: invoice.value.to.customerName,
+    documentType: invoice.value.documentType,
   })
   localStorage.setItem(HISTORY_KEY, JSON.stringify(invoiceHistory.value))
 
@@ -1430,10 +1527,12 @@ const generatePreview = async () => {
     const pdf = new jsPDF('p', 'mm', 'a4')
 
     // Set PDF document properties
-    const invoiceTitle = invoice.value.number || 'Invoice'
+    const docConfig = DOCUMENT_TYPE_CONFIG[invoice.value.documentType]
+    const docTitle = documentTypeTitle(invoice.value.documentType)
+    const invoiceTitle = invoice.value.number || docTitle
     pdf.setProperties({
       title: invoiceTitle,
-      subject: `Invoice ${invoiceTitle}`,
+      subject: `${docTitle} ${invoiceTitle}`,
       creator: 'Numerand Invoice Generator',
     })
 
@@ -1454,8 +1553,8 @@ const generatePreview = async () => {
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor('#78716c')
 
-      // Draw "SAMPLE INVOICE" diagonally across the page
-      const text = 'SAMPLE INVOICE'
+      // Draw "SAMPLE {TYPE}" diagonally across the page
+      const text = `SAMPLE ${docTitle}`
       for (let i = -1; i <= 1; i++) {
         const yPos = (pageHeight / 2) + (i * 80)
         pdf.text(text, pageWidth / 2, yPos, { angle: -35, align: 'center' })
@@ -1528,13 +1627,21 @@ const generatePreview = async () => {
     if (invoice.value.logo) {
       try { pdf.addImage(invoice.value.logo, 'JPEG', margin, y, 18, 18) } catch {}
     }
-    addText(t('invoice'), invoice.value.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
+    addText(docTitle, invoice.value.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
     addText(invoice.value.number || 'Draft', invoice.value.logo ? margin + 25 : margin, y + 16, 10, 'normal', 'left', '#78716c')
 
     addText(`${t('date')}: ${formatDate(invoice.value.date)}`, pageWidth - margin, y + 8, 9, 'normal', 'right', '#78716c')
-    addText(`${t('due')}: ${formatDate(invoice.value.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+    if (docConfig.hasDueDate) {
+      addText(`${t('due')}: ${formatDate(invoice.value.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+    }
 
     y += 35
+
+    // Payment method for receipts
+    if (docConfig.hasPaymentMethod && invoice.value.paymentMethod) {
+      const methodLabels: Record<string, string> = { cash: 'Cash', credit_card: 'Credit Card', bank_transfer: 'Bank Transfer', check: 'Check' }
+      addText(`${t('paymentMethod')}: ${methodLabels[invoice.value.paymentMethod] || invoice.value.paymentMethod}`, pageWidth - margin, y - 16, 9, 'normal', 'right', '#78716c')
+    }
 
     // From / To
     addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
@@ -1564,9 +1671,11 @@ const generatePreview = async () => {
     y += 6
 
     addText(t('description'), margin, y, 8, 'bold', 'left', '#a8a29e')
-    addText(t('qty'), pageWidth - margin - 60, y, 8, 'bold', 'right', '#a8a29e')
-    addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
-    addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+    addText(t('qty'), docConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+    if (docConfig.hasPrices) {
+      addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
+      addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+    }
     y += 3
     pdf.line(margin, y, pageWidth - margin, y)
     y += 6
@@ -1578,9 +1687,11 @@ const generatePreview = async () => {
       invoice.value.items.forEach(item => {
         const desc = item.description?.length > 40 ? item.description.substring(0, 37) + '...' : (item.description || '—')
         addText(desc, margin, y, 9, 'normal', 'left', '#1c1917')
-        addText(String(item.quantity), pageWidth - margin - 60, y, 9, 'normal', 'right', '#57534e')
-        addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
-        addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+        addText(String(item.quantity), docConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+        if (docConfig.hasPrices) {
+          addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
+          addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+        }
         y += 7
       })
     }
@@ -1590,24 +1701,28 @@ const generatePreview = async () => {
     y += 12
 
     // Totals
-    addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-    addText(`${currency.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-    y += 6
-    addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-    addText(`${currency.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-    y += 8
-    pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
-    y += 6
-    addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
-    addText(`${currency.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+    if (docConfig.hasTotals) {
+      addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+      addText(`${currency.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+      y += 6
+      addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+      addText(`${currency.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+      y += 8
+      pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
+      y += 6
+      addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
+      addText(`${currency.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+    }
 
     // Notes and Payment Terms
-    if (invoice.value.notes || invoice.value.terms) {
+    const showNotes = invoice.value.notes
+    const showTerms = docConfig.hasTerms && invoice.value.terms
+    if (showNotes || showTerms) {
       y += 20
       pdf.line(margin, y, pageWidth - margin, y)
       y += 10
 
-      if (invoice.value.notes) {
+      if (showNotes) {
         addText(t('notes'), margin, y, 8, 'bold', 'left', '#a8a29e')
         y += 6
         const notesLines = pdf.splitTextToSize(invoice.value.notes, contentWidth)
@@ -1618,7 +1733,7 @@ const generatePreview = async () => {
         y += 5
       }
 
-      if (invoice.value.terms) {
+      if (showTerms) {
         addText(t('paymentTerms'), margin, y, 8, 'bold', 'left', '#a8a29e')
         y += 6
         const termsLines = pdf.splitTextToSize(invoice.value.terms, contentWidth)
@@ -1660,6 +1775,9 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   const { default: jsPDF } = await import('jspdf')
   const pdf = new jsPDF('p', 'mm', 'a4')
 
+  const blobDocConfig = DOCUMENT_TYPE_CONFIG[invoiceData.documentType || 'invoice']
+  const blobDocTitle = documentTypeTitle(invoiceData.documentType || 'invoice')
+
   // Calculate totals for this invoice
   const calcSubtotal = invoiceData.items.reduce((sum, item) => sum + item.quantity * item.price, 0)
   const calcTotalTax = invoiceData.items.reduce((sum, item) => {
@@ -1675,10 +1793,10 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   let y = margin
 
   // Set PDF document properties
-  const invoiceTitle = invoiceData.number || 'Invoice'
+  const invoiceTitle = invoiceData.number || blobDocTitle
   pdf.setProperties({
     title: invoiceTitle,
-    subject: `Invoice ${invoiceTitle}`,
+    subject: `${blobDocTitle} ${invoiceTitle}`,
     creator: 'Numerand Invoice Generator',
   })
 
@@ -1689,7 +1807,7 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   pdf.setFontSize(48)
   pdf.setFont('helvetica', 'bold')
   pdf.setTextColor('#78716c')
-  const wmText = 'SAMPLE INVOICE'
+  const wmText = `SAMPLE ${blobDocTitle}`
   for (let i = -1; i <= 1; i++) {
     pdf.text(wmText, pageWidth / 2, (pageHeight / 2) + (i * 80), { angle: -35, align: 'center' })
   }
@@ -1734,11 +1852,19 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   // Header
   y += 5
   if (invoiceData.logo) { try { pdf.addImage(invoiceData.logo, 'JPEG', margin, y, 18, 18) } catch {} }
-  addText(t('invoice'), invoiceData.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
+  addText(blobDocTitle, invoiceData.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
   addText(invoiceData.number || 'Draft', invoiceData.logo ? margin + 25 : margin, y + 16, 10, 'normal', 'left', '#78716c')
   addText(`${t('date')}: ${formatDate(invoiceData.date)}`, pageWidth - margin, y + 8, 9, 'normal', 'right', '#78716c')
-  addText(`${t('due')}: ${formatDate(invoiceData.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+  if (blobDocConfig.hasDueDate) {
+    addText(`${t('due')}: ${formatDate(invoiceData.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+  }
   y += 35
+
+  // Payment method for receipts
+  if (blobDocConfig.hasPaymentMethod && invoiceData.paymentMethod) {
+    const methodLabels: Record<string, string> = { cash: 'Cash', credit_card: 'Credit Card', bank_transfer: 'Bank Transfer', check: 'Check' }
+    addText(`${t('paymentMethod')}: ${methodLabels[invoiceData.paymentMethod] || invoiceData.paymentMethod}`, pageWidth - margin, y - 16, 9, 'normal', 'right', '#78716c')
+  }
 
   // From/To
   addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
@@ -1765,9 +1891,11 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   pdf.line(margin, y, pageWidth - margin, y)
   y += 6
   addText(t('description'), margin, y, 8, 'bold', 'left', '#a8a29e')
-  addText(t('qty'), pageWidth - margin - 60, y, 8, 'bold', 'right', '#a8a29e')
-  addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
-  addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+  addText(t('qty'), blobDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+  if (blobDocConfig.hasPrices) {
+    addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
+    addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+  }
   y += 3
   pdf.line(margin, y, pageWidth - margin, y)
   y += 6
@@ -1775,9 +1903,11 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   invoiceData.items.forEach(item => {
     const desc = item.description?.length > 40 ? item.description.substring(0, 37) + '...' : (item.description || '—')
     addText(desc, margin, y, 9, 'normal', 'left', '#1c1917')
-    addText(String(item.quantity), pageWidth - margin - 60, y, 9, 'normal', 'right', '#57534e')
-    addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
-    addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+    addText(String(item.quantity), blobDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+    if (blobDocConfig.hasPrices) {
+      addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
+      addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+    }
     y += 7
   })
 
@@ -1785,30 +1915,34 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   y += 5
   pdf.line(margin, y, pageWidth - margin, y)
   y += 12
-  addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-  addText(`${currency.value}${calcSubtotal.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-  y += 6
-  addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-  addText(`${currency.value}${calcTotalTax.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-  y += 8
-  pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
-  y += 6
-  addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
-  addText(`${currency.value}${calcTotal.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+  if (blobDocConfig.hasTotals) {
+    addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+    addText(`${currency.value}${calcSubtotal.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+    y += 6
+    addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+    addText(`${currency.value}${calcTotalTax.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+    y += 8
+    pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
+    y += 6
+    addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
+    addText(`${currency.value}${calcTotal.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+  }
 
   // Notes and Terms
-  if (invoiceData.notes || invoiceData.terms) {
+  const blobShowNotes = invoiceData.notes
+  const blobShowTerms = blobDocConfig.hasTerms && invoiceData.terms
+  if (blobShowNotes || blobShowTerms) {
     y += 20
     pdf.line(margin, y, pageWidth - margin, y)
     y += 10
-    if (invoiceData.notes) {
+    if (blobShowNotes) {
       addText(t('notes'), margin, y, 8, 'bold', 'left', '#a8a29e')
       y += 6
       const notesLines = pdf.splitTextToSize(invoiceData.notes, contentWidth)
       notesLines.forEach((line: string) => { addText(line, margin, y, 9, 'normal', 'left', '#57534e'); y += 5 })
       y += 5
     }
-    if (invoiceData.terms) {
+    if (blobShowTerms) {
       addText(t('paymentTerms'), margin, y, 8, 'bold', 'left', '#a8a29e')
       y += 6
       const termsLines = pdf.splitTextToSize(invoiceData.terms, contentWidth)
@@ -1864,12 +1998,13 @@ const handleExportAll = async (format: 'zip' | 'json' | 'csv') => {
       a.click()
       URL.revokeObjectURL(a.href)
     } else if (format === 'csv') {
-      const headers = ['Invoice Number', 'Date', 'Due Date', 'From', 'To', 'Items', 'Subtotal', 'Tax', 'Total', 'Saved At']
+      const headers = ['Document Type', 'Number', 'Date', 'Due Date', 'From', 'To', 'Items', 'Subtotal', 'Tax', 'Total', 'Saved At']
       const rows = invoiceHistory.value.map(saved => {
         const inv = saved.invoice
         const subtotal = inv.items.reduce((sum, item) => sum + item.quantity * item.price, 0)
         const tax = inv.items.reduce((sum, item) => sum + (item.quantity * item.price * item.tax / 100), 0)
         return [
+          saved.documentType || inv.documentType || 'invoice',
           inv.number,
           inv.date,
           inv.dueDate,
@@ -1906,16 +2041,17 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
   isExporting.value = true
   exportingFormat.value = format
 
+  const expDocConfig = DOCUMENT_TYPE_CONFIG[invoice.value.documentType]
+  const expDocTitle = documentTypeTitle(invoice.value.documentType)
+
   try {
     if (format === 'pdf') {
       const { default: jsPDF } = await import('jspdf')
       const pdf = new jsPDF('p', 'mm', 'a4')
-
-      // Set PDF document properties
-      const invoiceTitle = invoice.value.number || 'Invoice'
+      const invoiceTitle = invoice.value.number || expDocTitle
       pdf.setProperties({
         title: invoiceTitle,
-        subject: `Invoice ${invoiceTitle}`,
+        subject: `${expDocTitle} ${invoiceTitle}`,
         creator: 'Numerand Invoice Generator',
       })
 
@@ -1932,7 +2068,7 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
       pdf.setFontSize(48)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor('#78716c')
-      const wmText = 'SAMPLE INVOICE'
+      const wmText = `SAMPLE ${expDocTitle}`
       for (let i = -1; i <= 1; i++) {
         pdf.text(wmText, pageWidth / 2, (pageHeight / 2) + (i * 80), { angle: -35, align: 'center' })
       }
@@ -1996,11 +2132,19 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
 
       y += 5
       if (invoice.value.logo) { try { pdf.addImage(invoice.value.logo, 'JPEG', margin, y, 18, 18) } catch {} }
-      addText(t('invoice'), invoice.value.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
+      addText(expDocTitle, invoice.value.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
       addText(invoice.value.number || 'Draft', invoice.value.logo ? margin + 25 : margin, y + 16, 10, 'normal', 'left', '#78716c')
       addText(`${t('date')}: ${formatDate(invoice.value.date)}`, pageWidth - margin, y + 8, 9, 'normal', 'right', '#78716c')
-      addText(`${t('due')}: ${formatDate(invoice.value.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+      if (expDocConfig.hasDueDate) {
+        addText(`${t('due')}: ${formatDate(invoice.value.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+      }
       y += 35
+
+      // Payment method for receipts
+      if (expDocConfig.hasPaymentMethod && invoice.value.paymentMethod) {
+        const methodLabels: Record<string, string> = { cash: 'Cash', credit_card: 'Credit Card', bank_transfer: 'Bank Transfer', check: 'Check' }
+        addText(`${t('paymentMethod')}: ${methodLabels[invoice.value.paymentMethod] || invoice.value.paymentMethod}`, pageWidth - margin, y - 16, 9, 'normal', 'right', '#78716c')
+      }
 
       addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
       addText(t('to'), pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
@@ -2027,9 +2171,11 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
       y += 6
 
       addText(t('description'), margin, y, 8, 'bold', 'left', '#a8a29e')
-      addText(t('qty'), pageWidth - margin - 60, y, 8, 'bold', 'right', '#a8a29e')
-      addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
-      addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+      addText(t('qty'), expDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+      if (expDocConfig.hasPrices) {
+        addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
+        addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+      }
       y += 3
       pdf.line(margin, y, pageWidth - margin, y)
       y += 6
@@ -2037,33 +2183,39 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
       invoice.value.items.forEach(item => {
         const desc = item.description?.length > 40 ? item.description.substring(0, 37) + '...' : (item.description || '—')
         addText(desc, margin, y, 9, 'normal', 'left', '#1c1917')
-        addText(String(item.quantity), pageWidth - margin - 60, y, 9, 'normal', 'right', '#57534e')
-        addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
-        addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+        addText(String(item.quantity), expDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+        if (expDocConfig.hasPrices) {
+          addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
+          addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+        }
         y += 7
       })
 
       y += 5
       pdf.line(margin, y, pageWidth - margin, y)
       y += 12
-      addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-      addText(`${currency.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-      y += 6
-      addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-      addText(`${currency.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-      y += 8
-      pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
-      y += 6
-      addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
-      addText(`${currency.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+      if (expDocConfig.hasTotals) {
+        addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+        addText(`${currency.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+        y += 6
+        addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+        addText(`${currency.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+        y += 8
+        pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
+        y += 6
+        addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
+        addText(`${currency.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+      }
 
       // Notes and Payment Terms
-      if (invoice.value.notes || invoice.value.terms) {
+      const expShowNotes = invoice.value.notes
+      const expShowTerms = expDocConfig.hasTerms && invoice.value.terms
+      if (expShowNotes || expShowTerms) {
         y += 20
         pdf.line(margin, y, pageWidth - margin, y)
         y += 10
 
-        if (invoice.value.notes) {
+        if (expShowNotes) {
           addText(t('notes'), margin, y, 8, 'bold', 'left', '#a8a29e')
           y += 6
           const notesLines = pdf.splitTextToSize(invoice.value.notes, contentWidth)
@@ -2074,7 +2226,7 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
           y += 5
         }
 
-        if (invoice.value.terms) {
+        if (expShowTerms) {
           addText(t('paymentTerms'), margin, y, 8, 'bold', 'left', '#a8a29e')
           y += 6
           const termsLines = pdf.splitTextToSize(invoice.value.terms, contentWidth)
@@ -2097,43 +2249,54 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
     } else if (format === 'excel') {
       const { default: XLSX } = await import('xlsx')
       const wb = XLSX.utils.book_new()
-      const data = [
-        ['Invoice', invoice.value.number],
+      const data: (string | number)[][] = [
+        ['Type', expDocTitle],
+        [expDocTitle, invoice.value.number],
         ['Date', formatDate(invoice.value.date)],
-        ['Due', formatDate(invoice.value.dueDate)],
+        ...(expDocConfig.hasDueDate ? [['Due', formatDate(invoice.value.dueDate)]] : []),
         [],
         ['From', invoice.value.from.businessName],
         ['To', invoice.value.to.customerName],
         [],
-        ['Description', 'Qty', 'Price', 'Total'],
-        ...invoice.value.items.map(i => [i.description, i.quantity, i.price, i.quantity * i.price]),
-        [],
-        ['Subtotal', '', '', subtotal.value],
-        ['Tax', '', '', totalTax.value],
-        ['Total', '', '', total.value]
       ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Invoice')
-      XLSX.writeFile(wb, `${invoice.value.number || 'invoice'}.xlsx`)
+      if (expDocConfig.hasPrices) {
+        data.push(['Description', 'Qty', 'Price', 'Total'])
+        data.push(...invoice.value.items.map(i => [i.description, i.quantity, i.price, i.quantity * i.price]))
+        data.push([])
+        data.push(['Subtotal', '', '', subtotal.value])
+        data.push(['Tax', '', '', totalTax.value])
+        data.push(['Total', '', '', total.value])
+      } else {
+        data.push(['Description', 'Qty'])
+        data.push(...invoice.value.items.map(i => [i.description, i.quantity]))
+      }
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), expDocTitle)
+      XLSX.writeFile(wb, `${invoice.value.number || 'document'}.xlsx`)
     } else if (format === 'csv') {
-      const rows = [
-        ['Description', 'Qty', 'Price', 'Total'],
-        ...invoice.value.items.map(i => [i.description, i.quantity, i.price, i.quantity * i.price]),
-        [],
-        ['Subtotal', '', '', subtotal.value],
-        ['Total', '', '', total.value]
-      ]
+      const rows: (string | number)[][] = expDocConfig.hasPrices
+        ? [
+            ['Description', 'Qty', 'Price', 'Total'],
+            ...invoice.value.items.map(i => [i.description, i.quantity, i.price, i.quantity * i.price]),
+            [],
+            ['Subtotal', '', '', subtotal.value],
+            ['Total', '', '', total.value]
+          ]
+        : [
+            ['Description', 'Qty'],
+            ...invoice.value.items.map(i => [i.description, i.quantity]),
+          ]
       const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `${invoice.value.number || 'invoice'}.csv`
+      a.download = `${invoice.value.number || 'document'}.csv`
       a.click()
     } else {
       const { logo, ...rest } = invoice.value
-      const blob = new Blob([JSON.stringify({ invoice: rest, total: total.value }, null, 2)], { type: 'application/json' })
+      const blob = new Blob([JSON.stringify({ documentType: invoice.value.documentType, invoice: rest, total: total.value }, null, 2)], { type: 'application/json' })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `${invoice.value.number || 'invoice'}.json`
+      a.download = `${invoice.value.number || 'document'}.json`
       a.click()
     }
     showToast('Exported')
@@ -2165,7 +2328,15 @@ onMounted(async () => {
     initializeInvoice()
 
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) invoice.value = { ...invoice.value, ...JSON.parse(saved) }
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      invoice.value = {
+        ...invoice.value,
+        ...parsed,
+        documentType: parsed.documentType || 'invoice',
+        paymentMethod: parsed.paymentMethod || '',
+      }
+    }
 
     const savedCustomers = localStorage.getItem(CUSTOMERS_KEY)
     if (savedCustomers) customers.value = JSON.parse(savedCustomers)

@@ -81,7 +81,7 @@ const client_manifest = {
     "module": true,
     "prefetch": true,
     "preload": true,
-    "file": "Ctuemi-0.js",
+    "file": "H_IdF-YK.js",
     "name": "entry",
     "src": "../node_modules/nuxt/dist/app/entry.js",
     "isEntry": true,
@@ -94,11 +94,11 @@ const client_manifest = {
       "../node_modules/nuxt/dist/app/components/error-500.vue"
     ],
     "css": [
-      "entry.CfErGxIe.css"
+      "entry.BNrAsXSj.css"
     ]
   },
-  "entry.CfErGxIe.css": {
-    "file": "entry.CfErGxIe.css",
+  "entry.BNrAsXSj.css": {
+    "file": "entry.BNrAsXSj.css",
     "resourceType": "style",
     "prefetch": true,
     "preload": true

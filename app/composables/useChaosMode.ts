@@ -534,6 +534,8 @@ export function useChaosMode() {
         : `INV-${Math.floor(Math.random() * 10000)}`,
       date: dates.date,
       dueDate: dates.dueDate,
+      documentType: 'invoice',
+      paymentMethod: '',
       logo: null,
       from: {
         businessName: randomFromArray(businessNames),

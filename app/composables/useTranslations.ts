@@ -11,6 +11,13 @@ const translations = {
     save: 'Save',
     export: 'Export',
 
+    // Document types
+    invoice: 'Invoice',
+    receipt: 'Receipt',
+    deliveryNote: 'Delivery Note',
+    ticket: 'Ticket',
+    documentType: 'Document Type',
+
     // Main form
     invoiceDetails: 'Invoice Details',
     invoiceNumber: 'Invoice Number',
@@ -23,6 +30,13 @@ const translations = {
     recommendedSize: 'Recommended: 200x200px, PNG or JPG',
     changeLogo: 'Change',
     removeLogo: 'Remove',
+
+    // Payment methods
+    paymentMethod: 'Payment Method',
+    cash: 'Cash',
+    creditCard: 'Credit Card',
+    bankTransfer: 'Bank Transfer',
+    check: 'Check',
 
     // From/To sections
     from: 'From',
@@ -177,6 +191,13 @@ const translations = {
     save: 'Guardar',
     export: 'Exportar',
 
+    // Document types
+    invoice: 'Factura',
+    receipt: 'Recibo',
+    deliveryNote: 'Albaran',
+    ticket: 'Ticket',
+    documentType: 'Tipo de Documento',
+
     // Main form
     invoiceDetails: 'Detalles de Factura',
     invoiceNumber: 'Numero de Factura',
@@ -189,6 +210,13 @@ const translations = {
     recommendedSize: 'Recomendado: 200x200px, PNG o JPG',
     changeLogo: 'Cambiar',
     removeLogo: 'Eliminar',
+
+    // Payment methods
+    paymentMethod: 'Metodo de Pago',
+    cash: 'Efectivo',
+    creditCard: 'Tarjeta de Credito',
+    bankTransfer: 'Transferencia Bancaria',
+    check: 'Cheque',
 
     // From/To sections
     from: 'De',

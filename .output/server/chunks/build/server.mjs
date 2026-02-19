@@ -1045,6 +1045,8 @@ function useChaosMode() {
       number: enableCrazyInvoiceNumbers ? randomFromArray(invoiceNumbers) : `INV-${Math.floor(Math.random() * 1e4)}`,
       date: dates.date,
       dueDate: dates.dueDate,
+      documentType: "invoice",
+      paymentMethod: "",
       logo: null,
       from: {
         businessName: randomFromArray(businessNames),
@@ -1182,6 +1184,44 @@ _sfc_main$4.setup = (props, ctx) => {
   return _sfc_setup$4 ? _sfc_setup$4(props, ctx) : void 0;
 };
 const ChaosConfigModal = /* @__PURE__ */ Object.assign(_export_sfc(_sfc_main$4, [["__scopeId", "data-v-a24f1625"]]), { __name: "ChaosConfigModal" });
+const DOCUMENT_TYPE_CONFIG = {
+  invoice: {
+    hasDueDate: true,
+    hasPrices: true,
+    hasTax: true,
+    hasTotals: true,
+    hasTerms: true,
+    hasPaymentMethod: false,
+    prefix: "INV-"
+  },
+  receipt: {
+    hasDueDate: false,
+    hasPrices: true,
+    hasTax: true,
+    hasTotals: true,
+    hasTerms: true,
+    hasPaymentMethod: true,
+    prefix: "REC-"
+  },
+  delivery_note: {
+    hasDueDate: false,
+    hasPrices: false,
+    hasTax: false,
+    hasTotals: false,
+    hasTerms: true,
+    hasPaymentMethod: false,
+    prefix: "DN-"
+  },
+  ticket: {
+    hasDueDate: true,
+    hasPrices: true,
+    hasTax: true,
+    hasTotals: true,
+    hasTerms: false,
+    hasPaymentMethod: false,
+    prefix: "TKT-"
+  }
+};
 const PDF_THEME = {
   id: "professional",
   name: "Professional",
@@ -1195,6 +1235,8 @@ const getDefaultInvoice = (defaultLogo = null) => ({
   number: "",
   date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
   dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0],
+  documentType: "invoice",
+  paymentMethod: "",
   logo: defaultLogo,
   from: {
     businessName: "",
@@ -1256,6 +1298,7 @@ function useInvoice() {
     isInitialized.value = true;
   };
   const { chaosOverrides: chaosOverrides2, generateChaoticInvoice, resetChaosMode, chaosEnabled: chaosEnabled2 } = useChaosMode();
+  const documentConfig = computed(() => DOCUMENT_TYPE_CONFIG[invoice.value.documentType]);
   const subtotal = computed(() => {
     if (chaosOverrides2.value?.subtotal !== void 0) {
       return chaosOverrides2.value.subtotal;
@@ -1329,7 +1372,8 @@ function useInvoice() {
       invoice: JSON.parse(JSON.stringify(invoice.value)),
       savedAt: (/* @__PURE__ */ new Date()).toISOString(),
       totalAmount: total.value,
-      customerName: invoice.value.to.customerName || "Unknown Customer"
+      customerName: invoice.value.to.customerName || "Unknown Customer",
+      documentType: invoice.value.documentType
     };
     invoiceHistory.value.unshift(savedInvoice);
     saveInvoiceHistory(invoiceHistory.value);
@@ -1350,7 +1394,9 @@ function useInvoice() {
     invoice.value = duplicated;
   };
   const clearInvoice = () => {
+    const currentDocType = invoice.value.documentType;
     invoice.value = getDefaultInvoice(loadDefaultLogo());
+    invoice.value.documentType = currentDocType;
     resetChaosMode();
   };
   const applyChaosMode = () => {
@@ -1462,6 +1508,7 @@ function useInvoice() {
     hasCompletedOnboarding,
     isInitialized,
     // Computed
+    documentConfig,
     subtotal,
     totalTax,
     total,
@@ -1498,7 +1545,8 @@ function useInvoice() {
     applyChaosMode,
     resetChaosMode,
     // Constants
-    PDF_THEME
+    PDF_THEME,
+    DOCUMENT_TYPE_CONFIG
   };
 }
 const isGenerating = ref(false);
@@ -1640,6 +1688,8 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       number: "",
       date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0],
+      documentType: "invoice",
+      paymentMethod: "",
       logo: null,
       from: { businessName: "", taxId: "", address: "", email: "", phone: "" },
       to: { customerName: "", taxId: "", address: "", email: "", phone: "" },
@@ -1653,6 +1703,10 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     const translations = {
       EN: {
         invoice: "INVOICE",
+        receipt: "RECEIPT",
+        deliveryNote: "DELIVERY NOTE",
+        ticket: "TICKET",
+        paymentMethod: "Payment Method",
         from: "FROM",
         to: "TO",
         description: "DESCRIPTION",
@@ -1672,6 +1726,10 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       },
       ES: {
         invoice: "FACTURA",
+        receipt: "RECIBO",
+        deliveryNote: "ALBARÁN",
+        ticket: "TICKET",
+        paymentMethod: "Método de Pago",
         from: "DE",
         to: "PARA",
         description: "DESCRIPCIÓN",
@@ -1691,6 +1749,10 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       },
       FR: {
         invoice: "FACTURE",
+        receipt: "REÇU",
+        deliveryNote: "BON DE LIVRAISON",
+        ticket: "TICKET",
+        paymentMethod: "Mode de Paiement",
         from: "DE",
         to: "À",
         description: "DESCRIPTION",
@@ -1710,6 +1772,10 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       },
       DE: {
         invoice: "RECHNUNG",
+        receipt: "QUITTUNG",
+        deliveryNote: "LIEFERSCHEIN",
+        ticket: "TICKET",
+        paymentMethod: "Zahlungsart",
         from: "VON",
         to: "AN",
         description: "BESCHREIBUNG",
@@ -1734,6 +1800,8 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     const showChaos = ref(false);
     const showExportAllMenu = ref(false);
     const showBulkGenerate = ref(false);
+    const hideBranding = ref(false);
+    ref(0);
     const isExporting = ref(false);
     const exportingFormat = ref(null);
     const justSaved = ref(false);
@@ -1771,6 +1839,16 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       return subtotal.value + totalTax.value;
     });
     const canDownload = computed(() => invoice2.value.number?.trim() && invoice2.value.from.businessName?.trim() && invoice2.value.to.customerName?.trim());
+    const currentDocConfig = computed(() => DOCUMENT_TYPE_CONFIG[invoice2.value.documentType]);
+    const documentTypeTitle = (docType) => {
+      const titleMap = {
+        invoice: "invoice",
+        receipt: "receipt",
+        delivery_note: "deliveryNote",
+        ticket: "ticket"
+      };
+      return t(titleMap[docType]);
+    };
     const showToast = (message, type = "success", action) => {
       const id = v4();
       const toast = { id, message, type };
@@ -1877,10 +1955,12 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       try {
         const { default: jsPDF } = await import('jspdf');
         const pdf = new jsPDF("p", "mm", "a4");
-        const invoiceTitle = invoice2.value.number || "Invoice";
+        const docConfig = DOCUMENT_TYPE_CONFIG[invoice2.value.documentType];
+        const docTitle = documentTypeTitle(invoice2.value.documentType);
+        const invoiceTitle = invoice2.value.number || docTitle;
         pdf.setProperties({
           title: invoiceTitle,
-          subject: `Invoice ${invoiceTitle}`,
+          subject: `${docTitle} ${invoiceTitle}`,
           creator: "Numerand Invoice Generator"
         });
         const pageWidth = 210;
@@ -1895,7 +1975,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           pdf.setFontSize(48);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor("#78716c");
-          const text = "SAMPLE INVOICE";
+          const text = `SAMPLE ${docTitle}`;
           for (let i = -1; i <= 1; i++) {
             const yPos = pageHeight / 2 + i * 80;
             pdf.text(text, pageWidth / 2, yPos, { angle: -35, align: "center" });
@@ -1939,7 +2019,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           pdf.setTextColor("#a8a29e");
           pdf.text(text2, startX, footerY);
         };
-        addWatermark();
+        if (!hideBranding.value) addWatermark();
         const addText = (text, x, yPos, size = 9, style = "normal", align = "left", color = "#374151") => {
           pdf.setFontSize(size);
           pdf.setFont("helvetica", style);
@@ -1956,11 +2036,17 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           } catch {
           }
         }
-        addText(t("invoice"), invoice2.value.logo ? margin + 25 : margin, y + 10, 24, "bold", "left", "#1c1917");
+        addText(docTitle, invoice2.value.logo ? margin + 25 : margin, y + 10, 24, "bold", "left", "#1c1917");
         addText(invoice2.value.number || "Draft", invoice2.value.logo ? margin + 25 : margin, y + 16, 10, "normal", "left", "#78716c");
         addText(`${t("date")}: ${formatDate(invoice2.value.date)}`, pageWidth - margin, y + 8, 9, "normal", "right", "#78716c");
-        addText(`${t("due")}: ${formatDate(invoice2.value.dueDate)}`, pageWidth - margin, y + 14, 9, "normal", "right", "#78716c");
+        if (docConfig.hasDueDate) {
+          addText(`${t("due")}: ${formatDate(invoice2.value.dueDate)}`, pageWidth - margin, y + 14, 9, "normal", "right", "#78716c");
+        }
         y += 35;
+        if (docConfig.hasPaymentMethod && invoice2.value.paymentMethod) {
+          const methodLabels = { cash: "Cash", credit_card: "Credit Card", bank_transfer: "Bank Transfer", check: "Check" };
+          addText(`${t("paymentMethod")}: ${methodLabels[invoice2.value.paymentMethod] || invoice2.value.paymentMethod}`, pageWidth - margin, y - 16, 9, "normal", "right", "#78716c");
+        }
         addText(t("from"), margin, y, 8, "bold", "left", "#a8a29e");
         addText(t("to"), pageWidth / 2 + 10, y, 8, "bold", "left", "#a8a29e");
         y += 6;
@@ -2011,9 +2097,11 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
         pdf.line(margin, y, pageWidth - margin, y);
         y += 6;
         addText(t("description"), margin, y, 8, "bold", "left", "#a8a29e");
-        addText(t("qty"), pageWidth - margin - 60, y, 8, "bold", "right", "#a8a29e");
-        addText(t("price"), pageWidth - margin - 30, y, 8, "bold", "right", "#a8a29e");
-        addText(t("total"), pageWidth - margin, y, 8, "bold", "right", "#a8a29e");
+        addText(t("qty"), docConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 8, "bold", "right", "#a8a29e");
+        if (docConfig.hasPrices) {
+          addText(t("price"), pageWidth - margin - 30, y, 8, "bold", "right", "#a8a29e");
+          addText(t("total"), pageWidth - margin, y, 8, "bold", "right", "#a8a29e");
+        }
         y += 3;
         pdf.line(margin, y, pageWidth - margin, y);
         y += 6;
@@ -2024,30 +2112,36 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           invoice2.value.items.forEach((item) => {
             const desc = item.description?.length > 40 ? item.description.substring(0, 37) + "..." : item.description || "—";
             addText(desc, margin, y, 9, "normal", "left", "#1c1917");
-            addText(String(item.quantity), pageWidth - margin - 60, y, 9, "normal", "right", "#57534e");
-            addText(`${currency2.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, "normal", "right", "#57534e");
-            addText(`${currency2.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, "normal", "right", "#1c1917");
+            addText(String(item.quantity), docConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 9, "normal", "right", "#57534e");
+            if (docConfig.hasPrices) {
+              addText(`${currency2.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, "normal", "right", "#57534e");
+              addText(`${currency2.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, "normal", "right", "#1c1917");
+            }
             y += 7;
           });
         }
         y += 5;
         pdf.line(margin, y, pageWidth - margin, y);
         y += 12;
-        addText(t("subtotal"), pageWidth - margin - 40, y, 9, "normal", "left", "#78716c");
-        addText(`${currency2.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, "normal", "right", "#57534e");
-        y += 6;
-        addText(t("tax"), pageWidth - margin - 40, y, 9, "normal", "left", "#78716c");
-        addText(`${currency2.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, "normal", "right", "#57534e");
-        y += 8;
-        pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y);
-        y += 6;
-        addText(t("total"), pageWidth - margin - 40, y, 10, "bold", "left", "#1c1917");
-        addText(`${currency2.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, "bold", "right", "#1c1917");
-        if (invoice2.value.notes || invoice2.value.terms) {
+        if (docConfig.hasTotals) {
+          addText(t("subtotal"), pageWidth - margin - 40, y, 9, "normal", "left", "#78716c");
+          addText(`${currency2.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, "normal", "right", "#57534e");
+          y += 6;
+          addText(t("tax"), pageWidth - margin - 40, y, 9, "normal", "left", "#78716c");
+          addText(`${currency2.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, "normal", "right", "#57534e");
+          y += 8;
+          pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y);
+          y += 6;
+          addText(t("total"), pageWidth - margin - 40, y, 10, "bold", "left", "#1c1917");
+          addText(`${currency2.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, "bold", "right", "#1c1917");
+        }
+        const showNotes = invoice2.value.notes;
+        const showTerms = docConfig.hasTerms && invoice2.value.terms;
+        if (showNotes || showTerms) {
           y += 20;
           pdf.line(margin, y, pageWidth - margin, y);
           y += 10;
-          if (invoice2.value.notes) {
+          if (showNotes) {
             addText(t("notes"), margin, y, 8, "bold", "left", "#a8a29e");
             y += 6;
             const notesLines = pdf.splitTextToSize(invoice2.value.notes, contentWidth);
@@ -2057,7 +2151,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
             });
             y += 5;
           }
-          if (invoice2.value.terms) {
+          if (showTerms) {
             addText(t("paymentTerms"), margin, y, 8, "bold", "left", "#a8a29e");
             y += 6;
             const termsLines = pdf.splitTextToSize(invoice2.value.terms, contentWidth);
@@ -2067,7 +2161,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
             });
           }
         }
-        addFooter();
+        if (!hideBranding.value) addFooter();
         if (chaosEnabled2.value && chaosConfig2.value.enableBadScanEffect) {
           applyBadScanEffect(pdf, pageWidth, pageHeight);
         }
@@ -2090,7 +2184,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
     }, { deep: true });
     return (_ctx, _push, _parent, _attrs) => {
-      _push(`<div${ssrRenderAttrs(mergeProps({ class: "h-screen flex flex-col bg-stone-50" }, _attrs))}><header class="h-14 border-b border-stone-200 bg-white flex-shrink-0 px-3 sm:px-4 flex items-center justify-between"><div class="flex items-center gap-2 sm:gap-4 min-w-0"><h1 class="text-sm font-medium tracking-tight whitespace-nowrap"><span class="text-stone-400">Sample</span> <span class="text-stone-900">Invoice Generator</span></h1><div class="hidden sm:flex items-center gap-2 text-xs"><span class="text-stone-600 font-medium">${ssrInterpolate(invoice2.value.number || "Untitled")}</span><span class="flex items-center gap-1 text-stone-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Auto-saved </span></div></div><div class="flex items-center gap-1 sm:gap-3"><select class="text-xs text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer hover:text-stone-900 transition-colors pr-4 sm:pr-6"><option value="$"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "$") : ssrLooseEqual(currency2.value, "$")) ? " selected" : ""}>USD</option><option value="€"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "€") : ssrLooseEqual(currency2.value, "€")) ? " selected" : ""}>EUR</option><option value="£"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "£") : ssrLooseEqual(currency2.value, "£")) ? " selected" : ""}>GBP</option><option value="¥"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "¥") : ssrLooseEqual(currency2.value, "¥")) ? " selected" : ""}>JPY</option><option value="CHF"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "CHF") : ssrLooseEqual(currency2.value, "CHF")) ? " selected" : ""}>CHF</option></select><select${ssrRenderAttr("value", language2.value)} class="hidden sm:block text-xs text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer hover:text-stone-900 transition-colors pr-6"><option value="EN">EN</option><option value="ES">ES</option><option value="FR">FR</option><option value="DE">DE</option></select><div class="hidden sm:block w-px h-4 bg-stone-200"></div><button class="btn-ghost hidden sm:inline-flex"> History </button><button class="btn-ghost hidden sm:inline-flex"> Clear </button><button${ssrIncludeBooleanAttr(!canDownload.value || justSaved.value) ? " disabled" : ""} class="${ssrRenderClass([
+      _push(`<div${ssrRenderAttrs(mergeProps({ class: "h-screen flex flex-col bg-stone-50" }, _attrs))}><header class="h-14 border-b border-stone-200 bg-white flex-shrink-0 px-3 sm:px-4 flex items-center justify-between"><div class="flex items-center gap-2 sm:gap-4 min-w-0"><h1 class="text-sm font-medium tracking-tight whitespace-nowrap cursor-default select-none"><span class="text-stone-400">Sample</span> <span class="text-stone-900">Invoice Generator</span></h1><div class="hidden sm:flex items-center gap-2 text-xs"><span class="text-stone-600 font-medium">${ssrInterpolate(invoice2.value.number || "Untitled")}</span><span class="flex items-center gap-1 text-stone-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Auto-saved </span></div></div><div class="flex items-center gap-1 sm:gap-3"><select${ssrRenderAttr("value", invoice2.value.documentType)} class="text-xs text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer hover:text-stone-900 transition-colors pr-4 sm:pr-6"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="delivery_note">Delivery Note</option><option value="ticket">Ticket</option></select><div class="hidden sm:block w-px h-4 bg-stone-200"></div><select class="text-xs text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer hover:text-stone-900 transition-colors pr-4 sm:pr-6"><option value="$"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "$") : ssrLooseEqual(currency2.value, "$")) ? " selected" : ""}>USD</option><option value="€"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "€") : ssrLooseEqual(currency2.value, "€")) ? " selected" : ""}>EUR</option><option value="£"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "£") : ssrLooseEqual(currency2.value, "£")) ? " selected" : ""}>GBP</option><option value="¥"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "¥") : ssrLooseEqual(currency2.value, "¥")) ? " selected" : ""}>JPY</option><option value="CHF"${ssrIncludeBooleanAttr(Array.isArray(currency2.value) ? ssrLooseContain(currency2.value, "CHF") : ssrLooseEqual(currency2.value, "CHF")) ? " selected" : ""}>CHF</option></select><select${ssrRenderAttr("value", language2.value)} class="hidden sm:block text-xs text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer hover:text-stone-900 transition-colors pr-6"><option value="EN">EN</option><option value="ES">ES</option><option value="FR">FR</option><option value="DE">DE</option></select><div class="hidden sm:block w-px h-4 bg-stone-200"></div><button class="btn-ghost hidden sm:inline-flex"> History </button><button class="btn-ghost hidden sm:inline-flex"> Clear </button><button${ssrIncludeBooleanAttr(!canDownload.value || justSaved.value) ? " disabled" : ""} class="${ssrRenderClass([
         "hidden sm:inline-flex items-center gap-1.5 transition-all duration-200",
         justSaved.value ? "btn-success" : "btn-secondary"
       ])}">`);
@@ -2126,7 +2220,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       } else {
         _push(`<div class="group relative h-20 border border-stone-200 flex items-center justify-center"><img${ssrRenderAttr("src", invoice2.value.logo)} alt="Logo" class="max-h-16 max-w-32 object-contain"><div class="absolute inset-0 bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4"><button class="text-xs text-stone-600 hover:text-stone-900">Change</button><button class="text-xs text-red-600 hover:text-red-700">Remove</button></div></div>`);
       }
-      _push(`<input type="file" accept="image/*" class="hidden"></div><div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4"><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number *</label><input${ssrRenderAttr("value", invoice2.value.number)} type="text" placeholder="INV-001" class="${ssrRenderClass([
+      _push(`<input type="file" accept="image/*" class="hidden"></div><div class="${ssrRenderClass(["grid grid-cols-1 gap-3 sm:gap-4", currentDocConfig.value.hasDueDate ? "sm:grid-cols-3" : "sm:grid-cols-2"])}"><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number *</label><input${ssrRenderAttr("value", invoice2.value.number)} type="text"${ssrRenderAttr("placeholder", currentDocConfig.value.prefix + "001")} class="${ssrRenderClass([
         "w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1 transition-colors",
         fieldErrors.value.invoiceNumber ? "border-red-400 focus:border-red-500" : "border-stone-200 focus:border-stone-900"
       ])}">`);
@@ -2135,7 +2229,19 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       } else {
         _push(`<!---->`);
       }
-      _push(`</div><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Date</label><input${ssrRenderAttr("value", invoice2.value.date)} type="date" class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors"></div><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Due</label><input${ssrRenderAttr("value", invoice2.value.dueDate)} type="date" class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors"></div></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8"><div class="space-y-3"><label class="block text-[10px] uppercase tracking-wider text-stone-400">From *</label><div><input${ssrRenderAttr("value", invoice2.value.from.businessName)} type="text" placeholder="Your business" class="${ssrRenderClass([
+      _push(`</div><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Date</label><input${ssrRenderAttr("value", invoice2.value.date)} type="date" class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors"></div>`);
+      if (currentDocConfig.value.hasDueDate) {
+        _push(`<div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Due</label><input${ssrRenderAttr("value", invoice2.value.dueDate)} type="date" class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors"></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      _push(`</div>`);
+      if (currentDocConfig.value.hasPaymentMethod) {
+        _push(`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Payment Method</label><select class="w-full text-sm text-stone-900 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-1 transition-colors bg-transparent"><option value=""${ssrIncludeBooleanAttr(Array.isArray(invoice2.value.paymentMethod) ? ssrLooseContain(invoice2.value.paymentMethod, "") : ssrLooseEqual(invoice2.value.paymentMethod, "")) ? " selected" : ""}>Select...</option><option value="cash"${ssrIncludeBooleanAttr(Array.isArray(invoice2.value.paymentMethod) ? ssrLooseContain(invoice2.value.paymentMethod, "cash") : ssrLooseEqual(invoice2.value.paymentMethod, "cash")) ? " selected" : ""}>Cash</option><option value="credit_card"${ssrIncludeBooleanAttr(Array.isArray(invoice2.value.paymentMethod) ? ssrLooseContain(invoice2.value.paymentMethod, "credit_card") : ssrLooseEqual(invoice2.value.paymentMethod, "credit_card")) ? " selected" : ""}>Credit Card</option><option value="bank_transfer"${ssrIncludeBooleanAttr(Array.isArray(invoice2.value.paymentMethod) ? ssrLooseContain(invoice2.value.paymentMethod, "bank_transfer") : ssrLooseEqual(invoice2.value.paymentMethod, "bank_transfer")) ? " selected" : ""}>Bank Transfer</option><option value="check"${ssrIncludeBooleanAttr(Array.isArray(invoice2.value.paymentMethod) ? ssrLooseContain(invoice2.value.paymentMethod, "check") : ssrLooseEqual(invoice2.value.paymentMethod, "check")) ? " selected" : ""}>Check</option></select></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      _push(`<div class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8"><div class="space-y-3"><label class="block text-[10px] uppercase tracking-wider text-stone-400">From *</label><div><input${ssrRenderAttr("value", invoice2.value.from.businessName)} type="text" placeholder="Your business" class="${ssrRenderClass([
         "w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1",
         fieldErrors.value.businessName ? "border-red-400 focus:border-red-500" : "border-stone-200 focus:border-stone-900"
       ])}">`);
@@ -2173,27 +2279,62 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       if (invoice2.value.items.length === 0) {
         _push(`<div class="py-16 text-center border border-dashed border-stone-200 bg-stone-50/50"><svg class="w-10 h-10 mx-auto text-stone-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg><p class="text-sm text-stone-500 mb-1">No line items yet</p><p class="text-xs text-stone-400 mb-4">Add products or services to your invoice</p><button class="text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-50 active:bg-stone-100 transition-all duration-150 px-3 py-1.5 border border-stone-300 hover:border-stone-400 rounded active:scale-[0.98]"> Add first item </button></div>`);
       } else {
-        _push(`<div class="space-y-0"><div class="hidden sm:grid grid-cols-12 gap-2 pb-2 border-b border-stone-200 text-[10px] uppercase tracking-wider text-stone-400"><div class="col-span-5">Description</div><div class="col-span-1 text-center">Qty</div><div class="col-span-2 text-right">Price</div><div class="col-span-1 text-center">Tax %</div><div class="col-span-2 text-right">Total</div><div class="col-span-1"></div></div><div${ssrRenderAttrs({
+        _push(`<div class="space-y-0"><div class="${ssrRenderClass(["hidden sm:grid gap-2 pb-2 border-b border-stone-200 text-[10px] uppercase tracking-wider text-stone-400", currentDocConfig.value.hasPrices ? "grid-cols-12" : "grid-cols-12"])}"><div class="${ssrRenderClass(currentDocConfig.value.hasPrices ? "col-span-5" : "col-span-10")}">Description</div><div class="col-span-1 text-center">Qty</div>`);
+        if (currentDocConfig.value.hasPrices) {
+          _push(`<!--[--><div class="col-span-2 text-right">Price</div><div class="col-span-1 text-center">Tax %</div><div class="col-span-2 text-right">Total</div><!--]-->`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`<div class="col-span-1"></div></div><div${ssrRenderAttrs({
           name: "item-list",
           class: "hidden sm:block relative"
         })}>`);
         ssrRenderList(invoice2.value.items, (item, index) => {
-          _push(`<div class="grid grid-cols-12 gap-2 py-3 border-b border-stone-100 group items-center hover:bg-stone-50/50 transition-colors -mx-2 px-2"><div class="col-span-5"><input${ssrRenderAttr("value", item.description)} type="text" placeholder="Item description" class="w-full text-sm text-stone-900 placeholder-stone-300 border-0 focus:ring-0 p-0 bg-transparent"></div><div class="col-span-1"><input${ssrRenderAttr("value", item.quantity)} type="number" min="0" step="1" class="w-full text-sm text-stone-900 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"></div><div class="col-span-2"><input${ssrRenderAttr("value", item.price)} type="number" min="0" step="0.01" class="w-full text-sm text-stone-900 text-right border-0 focus:ring-0 p-0 tabular-nums bg-transparent"></div><div class="col-span-1"><input${ssrRenderAttr("value", item.tax)} type="number" min="0" max="100" step="0.5" class="w-full text-sm text-stone-500 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"></div><div class="col-span-2 text-sm text-stone-900 text-right tabular-nums font-medium">${ssrInterpolate(currency2.value)}${ssrInterpolate((item.quantity * item.price * (1 + item.tax / 100)).toFixed(2))}</div><div class="col-span-1 text-right"><button class="text-stone-300 hover:text-red-500 hover:bg-red-50 active:bg-red-100 transition-all duration-150 opacity-0 group-hover:opacity-100 p-1 -m-1 rounded" title="Remove item"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"></path></svg></button></div></div>`);
+          _push(`<div class="grid grid-cols-12 gap-2 py-3 border-b border-stone-100 group items-center hover:bg-stone-50/50 transition-colors -mx-2 px-2"><div class="${ssrRenderClass(currentDocConfig.value.hasPrices ? "col-span-5" : "col-span-10")}"><input${ssrRenderAttr("value", item.description)} type="text" placeholder="Item description" class="w-full text-sm text-stone-900 placeholder-stone-300 border-0 focus:ring-0 p-0 bg-transparent"></div><div class="col-span-1"><input${ssrRenderAttr("value", item.quantity)} type="number" min="0" step="1" class="w-full text-sm text-stone-900 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"></div>`);
+          if (currentDocConfig.value.hasPrices) {
+            _push(`<!--[--><div class="col-span-2"><input${ssrRenderAttr("value", item.price)} type="number" min="0" step="0.01" class="w-full text-sm text-stone-900 text-right border-0 focus:ring-0 p-0 tabular-nums bg-transparent"></div><div class="col-span-1"><input${ssrRenderAttr("value", item.tax)} type="number" min="0" max="100" step="0.5" class="w-full text-sm text-stone-500 text-center border-0 focus:ring-0 p-0 tabular-nums bg-transparent"></div><div class="col-span-2 text-sm text-stone-900 text-right tabular-nums font-medium">${ssrInterpolate(currency2.value)}${ssrInterpolate((item.quantity * item.price * (1 + item.tax / 100)).toFixed(2))}</div><!--]-->`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(`<div class="col-span-1 text-right"><button class="text-stone-300 hover:text-red-500 hover:bg-red-50 active:bg-red-100 transition-all duration-150 opacity-0 group-hover:opacity-100 p-1 -m-1 rounded" title="Remove item"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"></path></svg></button></div></div>`);
         });
         _push(`</div><div${ssrRenderAttrs({
           name: "item-list",
           class: "sm:hidden space-y-4 pt-2 relative"
         })}>`);
         ssrRenderList(invoice2.value.items, (item, index) => {
-          _push(`<div class="border border-stone-200 rounded-lg p-4 bg-white shadow-sm"><div class="flex items-center justify-between gap-3 mb-4"><input${ssrRenderAttr("value", item.description)} type="text" placeholder="Item description" class="flex-1 text-sm text-stone-900 placeholder-stone-300 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 bg-transparent min-h-[44px]"><button class="text-stone-400 hover:text-red-500 active:text-red-600 active:bg-red-50 p-2 -m-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors" aria-label="Remove item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div class="grid grid-cols-4 gap-3"><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Qty</label><input${ssrRenderAttr("value", item.quantity)} type="number" min="0" step="1" class="w-full text-sm text-stone-900 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"></div><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Price</label><input${ssrRenderAttr("value", item.price)} type="number" min="0" step="0.01" class="w-full text-sm text-stone-900 border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"></div><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Tax %</label><input${ssrRenderAttr("value", item.tax)} type="number" min="0" max="100" step="0.5" class="w-full text-sm text-stone-500 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"></div><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Total</label><div class="text-sm text-stone-900 font-medium tabular-nums py-2 text-right min-h-[44px] flex items-center justify-end">${ssrInterpolate(currency2.value)}${ssrInterpolate((item.quantity * item.price * (1 + item.tax / 100)).toFixed(2))}</div></div></div></div>`);
+          _push(`<div class="border border-stone-200 rounded-lg p-4 bg-white shadow-sm"><div class="flex items-center justify-between gap-3 mb-4"><input${ssrRenderAttr("value", item.description)} type="text" placeholder="Item description" class="flex-1 text-sm text-stone-900 placeholder-stone-300 border-0 border-b border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 bg-transparent min-h-[44px]"><button class="text-stone-400 hover:text-red-500 active:text-red-600 active:bg-red-50 p-2 -m-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors" aria-label="Remove item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div class="${ssrRenderClass(["grid gap-3", currentDocConfig.value.hasPrices ? "grid-cols-4" : "grid-cols-1"])}"><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Qty</label><input${ssrRenderAttr("value", item.quantity)} type="number" min="0" step="1" class="w-full text-sm text-stone-900 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"></div>`);
+          if (currentDocConfig.value.hasPrices) {
+            _push(`<!--[--><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Price</label><input${ssrRenderAttr("value", item.price)} type="number" min="0" step="0.01" class="w-full text-sm text-stone-900 border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"></div><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Tax %</label><input${ssrRenderAttr("value", item.tax)} type="number" min="0" max="100" step="0.5" class="w-full text-sm text-stone-500 text-center border border-stone-200 rounded-lg px-2 py-2 tabular-nums min-h-[44px]"></div><div><label class="block text-xs uppercase tracking-wider text-stone-400 mb-1.5">Total</label><div class="text-sm text-stone-900 font-medium tabular-nums py-2 text-right min-h-[44px] flex items-center justify-end">${ssrInterpolate(currency2.value)}${ssrInterpolate((item.quantity * item.price * (1 + item.tax / 100)).toFixed(2))}</div></div><!--]-->`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(`</div></div>`);
         });
-        _push(`</div><div class="pt-3 pb-2 flex flex-wrap items-center gap-2"><span class="text-[10px] uppercase tracking-wider text-stone-400">Quick tax:</span><div class="flex flex-wrap gap-1"><!--[-->`);
-        ssrRenderList([0, 5, 10, 15, 20, 21], (rate) => {
-          _push(`<button class="text-[10px] px-2 py-0.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 active:bg-stone-200 transition-all duration-150 rounded">${ssrInterpolate(rate)}% </button>`);
-        });
-        _push(`<!--]--></div></div><div class="pt-4 space-y-2 border-t border-stone-200"><div class="flex justify-between text-sm"><span class="text-stone-400">Subtotal</span><span class="tabular-nums">${ssrInterpolate(currency2.value)}${ssrInterpolate(subtotal.value.toFixed(2))}</span></div><div class="flex justify-between text-sm"><span class="text-stone-400">Tax</span><span class="tabular-nums">${ssrInterpolate(currency2.value)}${ssrInterpolate(totalTax.value.toFixed(2))}</span></div><div class="flex justify-between text-sm font-semibold pt-2 border-t border-stone-900"><span>Total</span><span class="tabular-nums text-lg">${ssrInterpolate(currency2.value)}${ssrInterpolate(total.value.toFixed(2))}</span></div></div></div>`);
+        _push(`</div>`);
+        if (currentDocConfig.value.hasPrices) {
+          _push(`<div class="pt-3 pb-2 flex flex-wrap items-center gap-2"><span class="text-[10px] uppercase tracking-wider text-stone-400">Quick tax:</span><div class="flex flex-wrap gap-1"><!--[-->`);
+          ssrRenderList([0, 5, 10, 15, 20, 21], (rate) => {
+            _push(`<button class="text-[10px] px-2 py-0.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 active:bg-stone-200 transition-all duration-150 rounded">${ssrInterpolate(rate)}% </button>`);
+          });
+          _push(`<!--]--></div></div>`);
+        } else {
+          _push(`<!---->`);
+        }
+        if (currentDocConfig.value.hasTotals) {
+          _push(`<div class="pt-4 space-y-2 border-t border-stone-200"><div class="flex justify-between text-sm"><span class="text-stone-400">Subtotal</span><span class="tabular-nums">${ssrInterpolate(currency2.value)}${ssrInterpolate(subtotal.value.toFixed(2))}</span></div><div class="flex justify-between text-sm"><span class="text-stone-400">Tax</span><span class="tabular-nums">${ssrInterpolate(currency2.value)}${ssrInterpolate(totalTax.value.toFixed(2))}</span></div><div class="flex justify-between text-sm font-semibold pt-2 border-t border-stone-900"><span>Total</span><span class="tabular-nums text-lg">${ssrInterpolate(currency2.value)}${ssrInterpolate(total.value.toFixed(2))}</span></div></div>`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`</div>`);
       }
-      _push(`</div><div class="space-y-4 pt-6 border-t border-stone-200"><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Notes</label><textarea rows="2" placeholder="Additional notes for the client..." class="w-full text-sm text-stone-900 placeholder-stone-300 bg-transparent border-0 border-b-2 border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 resize-none transition-colors">${ssrInterpolate(invoice2.value.notes)}</textarea></div><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Payment Terms</label><textarea rows="2" placeholder="Payment terms and conditions..." class="w-full text-sm text-stone-900 placeholder-stone-300 bg-transparent border-0 border-b-2 border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 resize-none transition-colors">${ssrInterpolate(invoice2.value.terms)}</textarea></div></div><div class="text-[10px] text-stone-400 pt-4 flex items-center gap-4"><span>Tab to navigate</span><span class="text-stone-300">|</span><span>Changes auto-save</span></div></div></div><div class="${ssrRenderClass([
+      _push(`</div><div class="space-y-4 pt-6 border-t border-stone-200"><div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Notes</label><textarea rows="2" placeholder="Additional notes for the client..." class="w-full text-sm text-stone-900 placeholder-stone-300 bg-transparent border-0 border-b-2 border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 resize-none transition-colors">${ssrInterpolate(invoice2.value.notes)}</textarea></div>`);
+      if (currentDocConfig.value.hasTerms) {
+        _push(`<div><label class="block text-[10px] uppercase tracking-wider text-stone-400 mb-2">Payment Terms</label><textarea rows="2" placeholder="Payment terms and conditions..." class="w-full text-sm text-stone-900 placeholder-stone-300 bg-transparent border-0 border-b-2 border-stone-200 focus:border-stone-900 focus:ring-0 px-0 py-2 resize-none transition-colors">${ssrInterpolate(invoice2.value.terms)}</textarea></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      _push(`</div><div class="text-[10px] text-stone-400 pt-4 flex items-center gap-4"><span>Tab to navigate</span><span class="text-stone-300">|</span><span>Changes auto-save</span></div></div></div><div class="${ssrRenderClass([
         "w-full lg:w-1/2 flex flex-col bg-stone-100 min-h-0 overflow-hidden",
         mobileView.value === "preview" ? "flex" : "hidden lg:flex"
       ])}">`);
@@ -2241,7 +2382,13 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           } else {
             _push2(`<div class="divide-y divide-stone-100"><!--[-->`);
             ssrRenderList(unref(invoiceHistory2), (saved) => {
-              _push2(`<div class="p-4 hover:bg-stone-50 cursor-pointer group"><div class="flex items-center justify-between"><span class="text-sm font-medium text-stone-900">${ssrInterpolate(saved.invoice.number)}</span><span class="text-xs text-stone-500 tabular-nums">${ssrInterpolate(currency2.value)}${ssrInterpolate((saved.totalAmount ?? 0).toFixed(2))}</span></div><div class="text-xs text-stone-400 mt-1">${ssrInterpolate(saved.customerName)}</div><div class="flex items-center justify-between mt-2"><span class="text-[10px] text-stone-300">${ssrInterpolate(new Date(saved.savedAt).toLocaleDateString())}</span><button class="text-[10px] text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"> Delete </button></div></div>`);
+              _push2(`<div class="p-4 hover:bg-stone-50 cursor-pointer group"><div class="flex items-center justify-between"><div class="flex items-center gap-1.5"><span class="text-sm font-medium text-stone-900">${ssrInterpolate(saved.invoice.number)}</span>`);
+              if ((saved.documentType || saved.invoice?.documentType || "invoice") !== "invoice") {
+                _push2(`<span class="text-[9px] font-medium px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded uppercase">${ssrInterpolate({ invoice: "", receipt: "REC", delivery_note: "DN", ticket: "TKT" }[saved.documentType || saved.invoice?.documentType || "invoice"])}</span>`);
+              } else {
+                _push2(`<!---->`);
+              }
+              _push2(`</div><span class="text-xs text-stone-500 tabular-nums">${ssrInterpolate(currency2.value)}${ssrInterpolate((saved.totalAmount ?? 0).toFixed(2))}</span></div><div class="text-xs text-stone-400 mt-1">${ssrInterpolate(saved.customerName)}</div><div class="flex items-center justify-between mt-2"><span class="text-[10px] text-stone-300">${ssrInterpolate(new Date(saved.savedAt).toLocaleDateString())}</span><button class="text-[10px] text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"> Delete </button></div></div>`);
             });
             _push2(`<!--]--></div>`);
           }

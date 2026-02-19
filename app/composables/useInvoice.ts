@@ -3,6 +3,57 @@ import { v4 as uuidv4 } from 'uuid'
 import { useChaosMode } from './useChaosMode'
 
 // Types
+export type DocumentType = 'invoice' | 'receipt' | 'delivery_note' | 'ticket'
+
+export interface DocumentTypeConfig {
+  hasDueDate: boolean
+  hasPrices: boolean
+  hasTax: boolean
+  hasTotals: boolean
+  hasTerms: boolean
+  hasPaymentMethod: boolean
+  prefix: string
+}
+
+export const DOCUMENT_TYPE_CONFIG: Record<DocumentType, DocumentTypeConfig> = {
+  invoice: {
+    hasDueDate: true,
+    hasPrices: true,
+    hasTax: true,
+    hasTotals: true,
+    hasTerms: true,
+    hasPaymentMethod: false,
+    prefix: 'INV-',
+  },
+  receipt: {
+    hasDueDate: false,
+    hasPrices: true,
+    hasTax: true,
+    hasTotals: true,
+    hasTerms: true,
+    hasPaymentMethod: true,
+    prefix: 'REC-',
+  },
+  delivery_note: {
+    hasDueDate: false,
+    hasPrices: false,
+    hasTax: false,
+    hasTotals: false,
+    hasTerms: true,
+    hasPaymentMethod: false,
+    prefix: 'DN-',
+  },
+  ticket: {
+    hasDueDate: true,
+    hasPrices: true,
+    hasTax: true,
+    hasTotals: true,
+    hasTerms: false,
+    hasPaymentMethod: false,
+    prefix: 'TKT-',
+  },
+}
+
 export interface InvoiceItem {
   id: string
   description: string
@@ -15,6 +66,8 @@ export interface Invoice {
   number: string
   date: string
   dueDate: string
+  documentType: DocumentType
+  paymentMethod: string
   logo: string | null
   from: {
     businessName: string
@@ -41,6 +94,7 @@ export interface SavedInvoice {
   savedAt: string
   totalAmount: number
   customerName: string
+  documentType?: DocumentType
 }
 
 export interface Customer {
@@ -96,6 +150,8 @@ const getDefaultInvoice = (defaultLogo: string | null = null): Invoice => ({
   number: '',
   date: new Date().toISOString().split('T')[0],
   dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  documentType: 'invoice',
+  paymentMethod: '',
   logo: defaultLogo,
   from: {
     businessName: '',
@@ -146,6 +202,8 @@ export function useInvoice() {
       return {
         ...defaultInvoice,
         ...savedInvoice,
+        documentType: savedInvoice.documentType || 'invoice',
+        paymentMethod: savedInvoice.paymentMethod || '',
         from: { ...defaultInvoice.from, ...savedInvoice.from },
         to: { ...defaultInvoice.to, ...savedInvoice.to },
         items: savedInvoice.items || defaultInvoice.items,
@@ -265,6 +323,9 @@ export function useInvoice() {
   // Chaos mode integration
   const { chaosOverrides, generateChaoticInvoice, resetChaosMode, chaosEnabled } = useChaosMode()
 
+  // Document type config
+  const documentConfig = computed(() => DOCUMENT_TYPE_CONFIG[invoice.value.documentType])
+
   // Computed properties (with chaos override support)
   const subtotal = computed(() => {
     if (chaosOverrides.value?.subtotal !== undefined) {
@@ -360,6 +421,7 @@ export function useInvoice() {
       savedAt: new Date().toISOString(),
       totalAmount: total.value,
       customerName: invoice.value.to.customerName || 'Unknown Customer',
+      documentType: invoice.value.documentType,
     }
 
     invoiceHistory.value.unshift(savedInvoice)
@@ -385,7 +447,9 @@ export function useInvoice() {
   }
 
   const clearInvoice = () => {
+    const currentDocType = invoice.value.documentType
     invoice.value = getDefaultInvoice(loadDefaultLogo())
+    invoice.value.documentType = currentDocType
     resetChaosMode()
   }
 
@@ -538,6 +602,7 @@ export function useInvoice() {
     isInitialized,
 
     // Computed
+    documentConfig,
     subtotal,
     totalTax,
     total,
@@ -578,5 +643,6 @@ export function useInvoice() {
 
     // Constants
     PDF_THEME,
+    DOCUMENT_TYPE_CONFIG,
   }
 }

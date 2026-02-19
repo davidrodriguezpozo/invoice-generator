@@ -272,7 +272,7 @@ async function renderInlineStyles(usedModules) {
 
 const renderSSRHeadOptions = {"omitLineBreaks":true};
 
-const entryFileName = "Ctuemi-0.js";
+const entryFileName = "H_IdF-YK.js";
 
 globalThis.__buildAssetsURL = buildAssetsURL;
 globalThis.__publicAssetsURL = publicAssetsURL;
