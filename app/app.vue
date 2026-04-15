@@ -3,7 +3,7 @@
     <!-- Minimal Header -->
     <header class="h-14 border-b border-stone-200 bg-white flex-shrink-0 px-3 sm:px-4 flex items-center justify-between">
       <div class="flex items-center gap-2 sm:gap-4 min-w-0">
-        <h1 @click="handleTitleClick" class="text-sm font-medium tracking-tight whitespace-nowrap cursor-default select-none"><span class="text-stone-400">Sample</span> <span class="text-stone-900">Invoice Generator</span></h1>
+        <h1 class="text-sm font-medium tracking-tight whitespace-nowrap cursor-default select-none"><span class="text-stone-400">Sample</span> <span class="text-stone-900">Invoice Generator</span></h1>
         <div class="hidden sm:flex items-center gap-2 text-xs">
           <span class="text-stone-600 font-medium">{{ invoice.number || 'Untitled' }}</span>
           <span class="flex items-center gap-1 text-stone-400">
@@ -994,8 +994,6 @@ const translations: Record<string, Record<string, string>> = {
     date: 'Date',
     due: 'Due',
     noItems: 'No items',
-    generatedWith: 'Generated with',
-    by: 'by',
   },
   ES: {
     invoice: 'FACTURA',
@@ -1019,8 +1017,6 @@ const translations: Record<string, Record<string, string>> = {
     date: 'Fecha',
     due: 'Vencimiento',
     noItems: 'Sin artículos',
-    generatedWith: 'Generado con',
-    by: 'por',
   },
   FR: {
     invoice: 'FACTURE',
@@ -1044,8 +1040,6 @@ const translations: Record<string, Record<string, string>> = {
     date: 'Date',
     due: 'Échéance',
     noItems: 'Aucun article',
-    generatedWith: 'Généré avec',
-    by: 'par',
   },
   DE: {
     invoice: 'RECHNUNG',
@@ -1069,8 +1063,6 @@ const translations: Record<string, Record<string, string>> = {
     date: 'Datum',
     due: 'Fällig',
     noItems: 'Keine Artikel',
-    generatedWith: 'Erstellt mit',
-    by: 'von',
   },
 }
 
@@ -1082,25 +1074,7 @@ const showChaos = ref(false)
 const showExportAllMenu = ref(false)
 const showBulkGenerate = ref(false)
 
-// Hidden branding toggle (click title 7 times to toggle)
 const hideBranding = ref(false)
-const titleClickCount = ref(0)
-let titleClickTimeout: ReturnType<typeof setTimeout> | null = null
-
-const handleTitleClick = () => {
-  titleClickCount.value++
-  if (titleClickTimeout) clearTimeout(titleClickTimeout)
-  titleClickTimeout = setTimeout(() => {
-    titleClickCount.value = 0
-  }, 2000)
-
-  if (titleClickCount.value >= 7) {
-    hideBranding.value = !hideBranding.value
-    localStorage.setItem('invoice-hide-branding', hideBranding.value ? 'true' : 'false')
-    titleClickCount.value = 0
-    generatePreview()
-  }
-}
 const isExporting = ref(false)
 const exportingFormat = ref<string | null>(null)
 const justSaved = ref(false)
@@ -1125,7 +1099,6 @@ const pdfPreviewUrl = ref<string | null>(null)
 const isGeneratingPreview = ref(false)
 const isDragging = ref(false)
 const logoInput = ref<HTMLInputElement | null>(null)
-const watermarkLogo = ref<string | null>(null)
 
 // Computed (with chaos override support)
 const subtotal = computed(() => {
@@ -1577,48 +1550,6 @@ const generatePreview = async () => {
       pdf.restoreGraphicsState()
     }
 
-    // Add footer with branding
-    const addFooter = () => {
-      const footerY = pageHeight - 12
-      pdf.setFontSize(10)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor('#a8a29e')
-
-      // Draw a small heart shape
-      const drawHeart = (x: number, y: number, size: number) => {
-        pdf.setFillColor('#ef4444')
-        const s = size
-        pdf.ellipse(x - s * 0.25, y - s * 0.15, s * 0.28, s * 0.25, 'F')
-        pdf.ellipse(x + s * 0.25, y - s * 0.15, s * 0.28, s * 0.25, 'F')
-        pdf.triangle(x - s * 0.5, y, x + s * 0.5, y, x, y + s * 0.55, 'F')
-      }
-
-      // Calculate centered position
-      const text1 = t('generatedWith')
-      const heartSize = 3
-      const spacing = 1.8
-
-      pdf.setFontSize(10)
-      const text1Width = pdf.getTextWidth(text1)
-      const totalWidth = text1Width + heartSize + spacing
-
-      let startX = (pageWidth - totalWidth) / 2
-
-      // Add logo if available
-      if (watermarkLogo.value) {
-        try {
-          const logoSize = 5
-          startX = (pageWidth - totalWidth - logoSize - spacing) / 2
-          pdf.addImage(watermarkLogo.value, 'PNG', startX, footerY - 4, logoSize, logoSize)
-          startX += logoSize + spacing
-        } catch (e) {}
-      }
-
-      pdf.text(text1, startX, footerY)
-      startX += text1Width + spacing
-      drawHeart(startX + heartSize / 2, footerY - 1, heartSize)
-    }
-
     if (!hideBranding.value) addWatermark()
 
     const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
@@ -1755,9 +1686,6 @@ const generatePreview = async () => {
       }
     }
 
-    // Add footer
-    if (!hideBranding.value) addFooter()
-
     // Add bad scan effect if enabled
     if (chaosEnabled.value && chaosConfig.value.enableBadScanEffect) {
       applyBadScanEffect(pdf, pageWidth, pageHeight)
@@ -1823,28 +1751,6 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
     pdf.text(wmText, pageWidth / 2, (pageHeight / 2) + (i * 80), { angle: -35, align: 'center' })
   }
   pdf.restoreGraphicsState()
-
-  // Footer function
-  const addFooter = () => {
-    const footerY = pageHeight - 12
-    pdf.setFontSize(10)
-    pdf.setFont('helvetica', 'normal')
-    pdf.setTextColor('#a8a29e')
-    const text1 = t('generatedWith')
-    const heartSize = 3
-    const spacing = 1.8
-    const text1Width = pdf.getTextWidth(text1)
-    const totalWidth = text1Width + heartSize + spacing
-    let startX = (pageWidth - totalWidth) / 2
-    pdf.text(text1, startX, footerY)
-    startX += text1Width + spacing
-    // Draw heart
-    pdf.setFillColor('#ef4444')
-    const s = heartSize
-    pdf.ellipse(startX + s / 2 - s * 0.25, footerY - 1 - s * 0.15, s * 0.28, s * 0.25, 'F')
-    pdf.ellipse(startX + s / 2 + s * 0.25, footerY - 1 - s * 0.15, s * 0.28, s * 0.25, 'F')
-    pdf.triangle(startX + s / 2 - s * 0.5, footerY - 1, startX + s / 2 + s * 0.5, footerY - 1, startX + s / 2, footerY - 1 + s * 0.55, 'F')
-  }
 
   const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
     pdf.setFontSize(size)
@@ -1957,8 +1863,6 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
       termsLines.forEach((line: string) => { addText(line, margin, y, 9, 'normal', 'left', '#57534e'); y += 5 })
     }
   }
-
-  if (!hideBranding.value) addFooter()
 
   // Return as blob
   return pdf.output('blob')
@@ -2082,48 +1986,6 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
       }
       pdf.restoreGraphicsState()
 
-      // Footer function for export
-      const addFooter = () => {
-        const footerY = pageHeight - 12
-        pdf.setFontSize(10)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setTextColor('#a8a29e')
-
-        // Draw a small heart shape
-        const drawHeart = (x: number, y: number, size: number) => {
-          pdf.setFillColor('#ef4444')
-          const s = size
-          pdf.ellipse(x - s * 0.25, y - s * 0.15, s * 0.28, s * 0.25, 'F')
-          pdf.ellipse(x + s * 0.25, y - s * 0.15, s * 0.28, s * 0.25, 'F')
-          pdf.triangle(x - s * 0.5, y, x + s * 0.5, y, x, y + s * 0.55, 'F')
-        }
-
-        // Calculate centered position
-        const text1 = t('generatedWith')
-        const heartSize = 3
-        const spacing = 1.8
-
-        pdf.setFontSize(10)
-        const text1Width = pdf.getTextWidth(text1)
-        const totalWidth = text1Width + heartSize + spacing
-
-        let startX = (pageWidth - totalWidth) / 2
-
-        // Add logo if available
-        if (watermarkLogo.value) {
-          try {
-            const logoSize = 5
-            startX = (pageWidth - totalWidth - logoSize - spacing) / 2
-            pdf.addImage(watermarkLogo.value, 'PNG', startX, footerY - 4, logoSize, logoSize)
-            startX += logoSize + spacing
-          } catch (e) {}
-        }
-
-        pdf.text(text1, startX, footerY)
-        startX += text1Width + spacing
-        drawHeart(startX + heartSize / 2, footerY - 1, heartSize)
-      }
-
       const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
         pdf.setFontSize(size)
         pdf.setFont('helvetica', style)
@@ -2240,9 +2102,6 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
         }
       }
 
-      // Add footer
-      if (!hideBranding.value) addFooter()
-
       // Add bad scan effect if enabled
       if (chaosEnabled.value && chaosConfig.value.enableBadScanEffect) {
         applyBadScanEffect(pdf, pageWidth, pageHeight)
@@ -2349,17 +2208,6 @@ onMounted(async () => {
 
     language.value = localStorage.getItem(LANGUAGE_KEY) || 'EN'
 
-    // Load hidden branding setting
-    hideBranding.value = localStorage.getItem('invoice-hide-branding') === 'true'
-
-    // Load watermark logo
-    const response = await fetch('/invoice-generator/logo.png')
-    const blob = await response.blob()
-    const reader = new FileReader()
-    reader.onload = () => {
-      watermarkLogo.value = reader.result as string
-    }
-    reader.readAsDataURL(blob)
   } catch (e) { console.error(e) }
 
   generatePreview()
