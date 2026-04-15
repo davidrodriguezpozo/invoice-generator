@@ -235,12 +235,12 @@
           <!-- From / To -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
             <div class="space-y-3">
-              <label class="block text-[10px] uppercase tracking-wider text-stone-400">From *</label>
+              <label class="block text-[10px] uppercase tracking-wider text-stone-400">{{ fromLabel }} *</label>
               <div>
                 <input
                   v-model="invoice.from.businessName"
                   type="text"
-                  placeholder="Your business"
+                  :placeholder="fromPlaceholder"
                   @blur="validateField('businessName')"
                   :class="[
                     'w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1',
@@ -278,7 +278,7 @@
             </div>
             <div class="space-y-3 relative">
               <div class="flex items-center justify-between">
-                <label class="block text-[10px] uppercase tracking-wider text-stone-400">To *</label>
+                <label class="block text-[10px] uppercase tracking-wider text-stone-400">{{ toLabel }} *</label>
                 <div class="flex items-center gap-2">
                   <button
                     v-if="customers.length > 0"
@@ -323,7 +323,7 @@
                 <input
                   v-model="invoice.to.customerName"
                   type="text"
-                  placeholder="Client name"
+                  :placeholder="toPlaceholder"
                   @blur="validateField('customerName')"
                   :class="[
                     'w-full text-sm text-stone-900 placeholder-stone-300 border-0 border-b focus:ring-0 px-0 py-1',
@@ -980,6 +980,8 @@ const translations: Record<string, Record<string, string>> = {
     paymentMethod: 'Payment Method',
     from: 'FROM',
     to: 'TO',
+    supplier: 'SUPPLIER',
+    deliveredTo: 'DELIVERED TO',
     description: 'DESCRIPTION',
     qty: 'QTY',
     price: 'PRICE',
@@ -1003,6 +1005,8 @@ const translations: Record<string, Record<string, string>> = {
     paymentMethod: 'Método de Pago',
     from: 'DE',
     to: 'PARA',
+    supplier: 'PROVEEDOR',
+    deliveredTo: 'ENTREGADO A',
     description: 'DESCRIPCIÓN',
     qty: 'CANT',
     price: 'PRECIO',
@@ -1026,6 +1030,8 @@ const translations: Record<string, Record<string, string>> = {
     paymentMethod: 'Mode de Paiement',
     from: 'DE',
     to: 'À',
+    supplier: 'FOURNISSEUR',
+    deliveredTo: 'LIVRÉ À',
     description: 'DESCRIPTION',
     qty: 'QTÉ',
     price: 'PRIX',
@@ -1049,6 +1055,8 @@ const translations: Record<string, Record<string, string>> = {
     paymentMethod: 'Zahlungsart',
     from: 'VON',
     to: 'AN',
+    supplier: 'LIEFERANT',
+    deliveredTo: 'GELIEFERT AN',
     description: 'BESCHREIBUNG',
     qty: 'MENGE',
     price: 'PREIS',
@@ -1142,6 +1150,12 @@ const canDownload = computed(() => invoice.value.number?.trim() && invoice.value
 
 // Document type config
 const currentDocConfig = computed(() => DOCUMENT_TYPE_CONFIG[invoice.value.documentType])
+
+const isDeliveryNote = computed(() => invoice.value.documentType === 'delivery_note')
+const fromLabel = computed(() => isDeliveryNote.value ? 'Supplier' : 'From')
+const toLabel = computed(() => isDeliveryNote.value ? 'Delivered To' : 'To')
+const fromPlaceholder = computed(() => isDeliveryNote.value ? 'Supplier name' : 'Your business')
+const toPlaceholder = computed(() => isDeliveryNote.value ? 'Restaurant name' : 'Client name')
 
 const documentTypeTitle = (docType: DocumentType): string => {
   const titleMap: Record<DocumentType, string> = {
@@ -1533,7 +1547,7 @@ const generatePreview = async () => {
     pdf.setProperties({
       title: invoiceTitle,
       subject: `${docTitle} ${invoiceTitle}`,
-      creator: 'Numerand Invoice Generator',
+      creator: 'Invoice Generator',
     })
 
     const pageWidth = 210
@@ -1581,14 +1595,12 @@ const generatePreview = async () => {
 
       // Calculate centered position
       const text1 = t('generatedWith')
-      const text2 = `${t('by')} Numerand`
       const heartSize = 3
       const spacing = 1.8
 
       pdf.setFontSize(10)
       const text1Width = pdf.getTextWidth(text1)
-      const text2Width = pdf.getTextWidth(text2)
-      const totalWidth = text1Width + heartSize + text2Width + spacing * 2
+      const totalWidth = text1Width + heartSize + spacing
 
       let startX = (pageWidth - totalWidth) / 2
 
@@ -1605,9 +1617,6 @@ const generatePreview = async () => {
       pdf.text(text1, startX, footerY)
       startX += text1Width + spacing
       drawHeart(startX + heartSize / 2, footerY - 1, heartSize)
-      startX += heartSize + spacing
-      pdf.setTextColor('#a8a29e')
-      pdf.text(text2, startX, footerY)
     }
 
     if (!hideBranding.value) addWatermark()
@@ -1644,8 +1653,10 @@ const generatePreview = async () => {
     }
 
     // From / To
-    addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
-    addText(t('to'), pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
+    const pdfFromLabel = docConfig.hasPrices === false && invoice.value.documentType === 'delivery_note' ? t('supplier') : t('from')
+    const pdfToLabel = docConfig.hasPrices === false && invoice.value.documentType === 'delivery_note' ? t('deliveredTo') : t('to')
+    addText(pdfFromLabel, margin, y, 8, 'bold', 'left', '#a8a29e')
+    addText(pdfToLabel, pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
     y += 6
 
     if (invoice.value.from.businessName) { addText(invoice.value.from.businessName, margin, y, 10, 'bold', 'left', '#1c1917'); y += 5 }
@@ -1797,7 +1808,7 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   pdf.setProperties({
     title: invoiceTitle,
     subject: `${blobDocTitle} ${invoiceTitle}`,
-    creator: 'Numerand Invoice Generator',
+    creator: 'Invoice Generator',
   })
 
   // Add watermark
@@ -1820,12 +1831,10 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor('#a8a29e')
     const text1 = t('generatedWith')
-    const text2 = `${t('by')} Numerand`
     const heartSize = 3
     const spacing = 1.8
     const text1Width = pdf.getTextWidth(text1)
-    const text2Width = pdf.getTextWidth(text2)
-    const totalWidth = text1Width + heartSize + text2Width + spacing * 2
+    const totalWidth = text1Width + heartSize + spacing
     let startX = (pageWidth - totalWidth) / 2
     pdf.text(text1, startX, footerY)
     startX += text1Width + spacing
@@ -1835,9 +1844,6 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
     pdf.ellipse(startX + s / 2 - s * 0.25, footerY - 1 - s * 0.15, s * 0.28, s * 0.25, 'F')
     pdf.ellipse(startX + s / 2 + s * 0.25, footerY - 1 - s * 0.15, s * 0.28, s * 0.25, 'F')
     pdf.triangle(startX + s / 2 - s * 0.5, footerY - 1, startX + s / 2 + s * 0.5, footerY - 1, startX + s / 2, footerY - 1 + s * 0.55, 'F')
-    startX += heartSize + spacing
-    pdf.setTextColor('#a8a29e')
-    pdf.text(text2, startX, footerY)
   }
 
   const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
@@ -1867,8 +1873,10 @@ const generatePDFBlob = async (invoiceData: Invoice): Promise<Blob> => {
   }
 
   // From/To
-  addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
-  addText(t('to'), pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
+  const blobFromLabel = invoiceData.documentType === 'delivery_note' ? t('supplier') : t('from')
+  const blobToLabel = invoiceData.documentType === 'delivery_note' ? t('deliveredTo') : t('to')
+  addText(blobFromLabel, margin, y, 8, 'bold', 'left', '#a8a29e')
+  addText(blobToLabel, pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
   y += 6
   if (invoiceData.from.businessName) { addText(invoiceData.from.businessName, margin, y, 10, 'bold', 'left', '#1c1917'); y += 5 }
   let fromY = y
@@ -2052,7 +2060,7 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
       pdf.setProperties({
         title: invoiceTitle,
         subject: `${expDocTitle} ${invoiceTitle}`,
-        creator: 'Numerand Invoice Generator',
+        creator: 'Invoice Generator',
       })
 
       const pageWidth = 210
@@ -2092,14 +2100,12 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
 
         // Calculate centered position
         const text1 = t('generatedWith')
-        const text2 = `${t('by')} Numerand`
         const heartSize = 3
         const spacing = 1.8
 
         pdf.setFontSize(10)
         const text1Width = pdf.getTextWidth(text1)
-        const text2Width = pdf.getTextWidth(text2)
-        const totalWidth = text1Width + heartSize + text2Width + spacing * 2
+        const totalWidth = text1Width + heartSize + spacing
 
         let startX = (pageWidth - totalWidth) / 2
 
@@ -2116,9 +2122,6 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
         pdf.text(text1, startX, footerY)
         startX += text1Width + spacing
         drawHeart(startX + heartSize / 2, footerY - 1, heartSize)
-        startX += heartSize + spacing
-        pdf.setTextColor('#a8a29e')
-        pdf.text(text2, startX, footerY)
       }
 
       const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
