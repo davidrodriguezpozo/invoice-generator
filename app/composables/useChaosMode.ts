@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
-import type { Invoice, InvoiceItem } from './useInvoice'
+import { DOCUMENT_TYPE_CONFIG, type Invoice, type InvoiceItem, type DocumentType } from './useInvoice'
+
+const ALL_DOCUMENT_TYPES: DocumentType[] = ['invoice', 'receipt', 'delivery_note', 'ticket']
 
 export type ChaosIntensity = 'mild' | 'medium' | 'extreme'
 
@@ -468,24 +470,26 @@ export function useChaosMode() {
       })
     }
 
-    // Apply tax chaos to existing items
-    if (enableTaxChaos) {
+    const docConfig = DOCUMENT_TYPE_CONFIG[chaosInvoice.documentType]
+
+    // Apply tax chaos to existing items (only meaningful for types that show prices)
+    if (enableTaxChaos && docConfig.hasPrices) {
       chaosInvoice.items.forEach(item => {
         item.tax = generateChaoticTax()
       })
     }
 
-    // Apply negative amounts to existing items
+    // Apply negative amounts (quantities shown on all types; prices only on types that show them)
     if (enableNegativeAmounts) {
       chaosInvoice.items.forEach(item => {
         const { quantity, price } = generateChaoticAmount()
         item.quantity = quantity
-        item.price = price
+        if (docConfig.hasPrices) item.price = price
       })
     }
 
-    // Generate mismatched totals based on items
-    if (enableTotalMismatch) {
+    // Generate mismatched totals only for types that display totals
+    if (enableTotalMismatch && docConfig.hasTotals) {
       generateMismatchedTotals(chaosInvoice.items)
     } else {
       chaosOverrides.value = null
@@ -495,12 +499,17 @@ export function useChaosMode() {
     return chaosInvoice
   }
 
-  // Generate a completely new chaotic invoice (legacy behavior)
-  const generateChaoticInvoice = (): Invoice => {
+  // Generate a completely new chaotic invoice for any document type
+  const generateChaoticInvoice = (documentType?: DocumentType): Invoice => {
     const {
       enableEmojiInjection,
       enableCrazyInvoiceNumbers,
+      enableTotalMismatch,
     } = chaosConfig.value
+
+    // Pick document type: use provided, or random
+    const docType: DocumentType = documentType ?? randomFromArray(ALL_DOCUMENT_TYPES)
+    const docConfig = DOCUMENT_TYPE_CONFIG[docType]
 
     // Select data arrays based on emoji setting
     const businessNames = enableEmojiInjection
@@ -525,17 +534,26 @@ export function useChaosMode() {
     const dates = generateChaoticDates()
     const items = generateChaoticItems()
 
-    // Generate mismatched totals based on items
-    generateMismatchedTotals(items)
+    // Only generate mismatched totals for types that show totals
+    if (enableTotalMismatch && docConfig.hasTotals) {
+      generateMismatchedTotals(items)
+    } else {
+      chaosOverrides.value = null
+    }
+
+    // Use the document type's own prefix for the number
+    const defaultNumber = `${docConfig.prefix}${Math.floor(Math.random() * 10000)}`
 
     const invoice: Invoice = {
       number: enableCrazyInvoiceNumbers
         ? randomFromArray(invoiceNumbers)
-        : `INV-${Math.floor(Math.random() * 10000)}`,
+        : defaultNumber,
       date: dates.date,
-      dueDate: dates.dueDate,
-      documentType: 'invoice',
-      paymentMethod: '',
+      dueDate: docConfig.hasDueDate ? dates.dueDate : '',
+      documentType: docType,
+      paymentMethod: docConfig.hasPaymentMethod
+        ? randomFromArray(['cash', 'credit_card', 'bank_transfer', 'check'])
+        : '',
       logo: null,
       from: {
         businessName: randomFromArray(businessNames),
@@ -553,7 +571,9 @@ export function useChaosMode() {
       },
       items,
       notes: injectEmojis('Payment is due upon receipt. Thank you for your business!'),
-      terms: injectEmojis('Net 30. Late fees may apply. Or not. Who knows? Not financial advice.'),
+      terms: docConfig.hasTerms
+        ? injectEmojis('Net 30. Late fees may apply. Or not. Who knows? Not financial advice.')
+        : '',
     }
 
     chaosEnabled.value = true

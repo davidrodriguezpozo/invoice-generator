@@ -1,11 +1,14 @@
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useChaosMode } from './useChaosMode'
-import { useInvoice, type Invoice, type SavedInvoice } from './useInvoice'
+import { DOCUMENT_TYPE_CONFIG, useInvoice, type DocumentType, type Invoice, type SavedInvoice } from './useInvoice'
+
+export type BulkDocumentType = DocumentType | 'random'
 
 export interface BulkGenerationOptions {
   count: number
   prefix: string
+  documentType: BulkDocumentType
   useDateRange: boolean
   startDate?: string
   endDate?: string
@@ -16,7 +19,7 @@ const isGenerating = ref(false)
 const progress = ref({ current: 0, total: 0 })
 
 export function useBulkGeneration() {
-  const { generateChaoticInvoice, chaosConfig } = useChaosMode()
+  const { generateChaoticInvoice } = useChaosMode()
   const { invoiceHistory, currency } = useInvoice()
 
   const HISTORY_KEY = 'invoice-generator-history'
@@ -51,19 +54,21 @@ export function useBulkGeneration() {
     progress.value = { current: 0, total: options.count }
 
     const invoices: SavedInvoice[] = []
+    const resolvedDocType = options.documentType === 'random' ? undefined : options.documentType
 
     try {
       for (let i = 0; i < options.count; i++) {
-        // Generate chaotic invoice
-        const invoice = generateChaoticInvoice()
+        // Generate chaotic document of the requested type (or random)
+        const invoice = generateChaoticInvoice(resolvedDocType)
 
-        // Apply custom invoice number with prefix
+        // Apply custom number with prefix
         invoice.number = `${options.prefix}${String(i + 1).padStart(3, '0')}`
 
         // Apply date range if enabled
         if (options.useDateRange && options.startDate && options.endDate) {
           invoice.date = randomDateInRange(options.startDate, options.endDate)
-          invoice.dueDate = addDays(invoice.date, 30)
+          const docConfig = DOCUMENT_TYPE_CONFIG[invoice.documentType]
+          invoice.dueDate = docConfig.hasDueDate ? addDays(invoice.date, 30) : ''
         }
 
         // Create saved invoice
@@ -72,7 +77,8 @@ export function useBulkGeneration() {
           invoice,
           savedAt: new Date().toISOString(),
           totalAmount: calculateTotal(invoice),
-          customerName: invoice.to.customerName
+          customerName: invoice.to.customerName,
+          documentType: invoice.documentType,
         }
 
         invoices.push(savedInvoice)

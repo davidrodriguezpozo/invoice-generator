@@ -21,7 +21,7 @@
           <div class="p-4 space-y-4">
             <!-- Count -->
             <div>
-              <div class="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number of Invoices</div>
+              <div class="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number of Documents</div>
               <div class="flex gap-1">
                 <button
                   v-for="count in countOptions"
@@ -39,9 +39,29 @@
               </div>
             </div>
 
+            <!-- Document Type -->
+            <div>
+              <div class="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Document Type</div>
+              <div class="grid grid-cols-3 gap-1">
+                <button
+                  v-for="dt in documentTypeOptions"
+                  :key="dt.value"
+                  @click="options.documentType = dt.value"
+                  :class="[
+                    'py-2 text-xs font-medium transition-colors',
+                    options.documentType === dt.value
+                      ? 'bg-stone-900 text-white'
+                      : 'text-stone-500 hover:bg-stone-100'
+                  ]"
+                >
+                  {{ dt.label }}
+                </button>
+              </div>
+            </div>
+
             <!-- Prefix -->
             <div>
-              <div class="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Invoice Number Prefix</div>
+              <div class="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Number Prefix</div>
               <input
                 v-model="options.prefix"
                 type="text"
@@ -126,7 +146,7 @@
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              {{ isGenerating ? 'Generating...' : `Generate ${options.count} Invoices` }}
+              {{ isGenerating ? 'Generating...' : `Generate ${options.count} Documents` }}
             </button>
           </div>
         </div>
@@ -137,7 +157,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { useBulkGeneration } from '../composables/useBulkGeneration'
+import { useBulkGeneration, type BulkDocumentType } from '../composables/useBulkGeneration'
 
 defineProps<{
   isOpen: boolean
@@ -152,6 +172,14 @@ const { isGenerating, progress, generateBulkInvoices } = useBulkGeneration()
 
 const countOptions = [5, 10, 25, 50, 100]
 
+const documentTypeOptions: { value: BulkDocumentType; label: string }[] = [
+  { value: 'random', label: 'Random' },
+  { value: 'invoice', label: 'Invoice' },
+  { value: 'receipt', label: 'Receipt' },
+  { value: 'delivery_note', label: 'Delivery Note' },
+  { value: 'ticket', label: 'Ticket' },
+]
+
 // Get dates for default range (last 6 months)
 const today = new Date()
 const sixMonthsAgo = new Date(today)
@@ -160,6 +188,7 @@ sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
 const options = reactive({
   count: 10,
   prefix: 'TEST-',
+  documentType: 'random' as BulkDocumentType,
   useDateRange: false,
   startDate: sixMonthsAgo.toISOString().split('T')[0],
   endDate: today.toISOString().split('T')[0],
