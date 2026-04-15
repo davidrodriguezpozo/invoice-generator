@@ -4,7 +4,13 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss'],
   app: {
-    baseURL: '/invoice-generator/'
+    baseURL: '/invoice-generator/',
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/invoice-generator/favicon.svg' },
+        { rel: 'icon', type: 'image/x-icon', href: '/invoice-generator/favicon.ico' },
+      ],
+    },
   },
   devServer: {
     port: 3001
