@@ -1948,8 +1948,161 @@ const handleExportAll = async (format: 'zip' | 'json' | 'csv') => {
   }
 }
 
+// Build a fully-rendered jsPDF document for the current invoice. Shared between PDF and PNG export.
+const buildInvoicePdf = async () => {
+  const expDocConfig = DOCUMENT_TYPE_CONFIG[invoice.value.documentType]
+  const expDocTitle = documentTypeTitle(invoice.value.documentType)
+
+  const { default: jsPDF } = await import('jspdf')
+  const pdf = new jsPDF('p', 'mm', 'a4')
+  const invoiceTitle = invoice.value.number || expDocTitle
+  pdf.setProperties({
+    title: invoiceTitle,
+    subject: `${expDocTitle} ${invoiceTitle}`,
+    creator: 'Invoice Generator',
+  })
+
+  const pageWidth = 210
+  const pageHeight = 297
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
+
+  pdf.saveGraphicsState()
+  const textGState = (pdf as any).GState({ opacity: 0.08 })
+  pdf.setGState(textGState)
+  pdf.setFontSize(48)
+  pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor('#78716c')
+  const wmText = `SAMPLE ${expDocTitle}`
+  for (let i = -1; i <= 1; i++) {
+    pdf.text(wmText, pageWidth / 2, (pageHeight / 2) + (i * 80), { angle: -35, align: 'center' })
+  }
+  pdf.restoreGraphicsState()
+
+  const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
+    pdf.setFontSize(size)
+    pdf.setFont('helvetica', style)
+    pdf.setTextColor(color)
+    let finalX = x
+    if (align === 'right') finalX = x - pdf.getTextWidth(text)
+    pdf.text(text, finalX, yPos)
+  }
+
+  y += 5
+  if (invoice.value.logo) { try { pdf.addImage(invoice.value.logo, 'JPEG', margin, y, 18, 18) } catch {} }
+  addText(expDocTitle, invoice.value.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
+  addText(invoice.value.number || 'Draft', invoice.value.logo ? margin + 25 : margin, y + 16, 10, 'normal', 'left', '#78716c')
+  addText(`${t('date')}: ${formatDate(invoice.value.date)}`, pageWidth - margin, y + 8, 9, 'normal', 'right', '#78716c')
+  if (expDocConfig.hasDueDate) {
+    addText(`${t('due')}: ${formatDate(invoice.value.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
+  }
+  y += 35
+
+  if (expDocConfig.hasPaymentMethod && invoice.value.paymentMethod) {
+    const methodLabels: Record<string, string> = { cash: 'Cash', credit_card: 'Credit Card', bank_transfer: 'Bank Transfer', check: 'Check' }
+    addText(`${t('paymentMethod')}: ${methodLabels[invoice.value.paymentMethod] || invoice.value.paymentMethod}`, pageWidth - margin, y - 16, 9, 'normal', 'right', '#78716c')
+  }
+
+  addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
+  addText(t('to'), pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
+  y += 6
+
+  if (invoice.value.from.businessName) { addText(invoice.value.from.businessName, margin, y, 10, 'bold', 'left', '#1c1917'); y += 5 }
+  let fromY = y
+  if (invoice.value.from.email) { addText(invoice.value.from.email, margin, y, 9); y += 4 }
+  if (invoice.value.from.address) { addText(invoice.value.from.address, margin, y, 9); y += 4 }
+  if (invoice.value.from.phone) { addText(invoice.value.from.phone, margin, y, 9); y += 4 }
+  if (invoice.value.from.taxId) { addText(`${t('taxId')}: ${invoice.value.from.taxId}`, margin, y, 8, 'normal', 'left', '#a8a29e'); y += 4 }
+
+  let toY = fromY - 5
+  if (invoice.value.to.customerName) { addText(invoice.value.to.customerName, pageWidth / 2 + 10, toY, 10, 'bold', 'left', '#1c1917'); toY += 5 }
+  if (invoice.value.to.email) { addText(invoice.value.to.email, pageWidth / 2 + 10, toY, 9); toY += 4 }
+  if (invoice.value.to.address) { addText(invoice.value.to.address, pageWidth / 2 + 10, toY, 9); toY += 4 }
+  if (invoice.value.to.phone) { addText(invoice.value.to.phone, pageWidth / 2 + 10, toY, 9); toY += 4 }
+  if (invoice.value.to.taxId) { addText(`${t('taxId')}: ${invoice.value.to.taxId}`, pageWidth / 2 + 10, toY, 8, 'normal', 'left', '#a8a29e') }
+
+  y = Math.max(y, toY) + 15
+  pdf.setDrawColor('#e7e5e4')
+  pdf.setLineWidth(0.3)
+  pdf.line(margin, y, pageWidth - margin, y)
+  y += 6
+
+  addText(t('description'), margin, y, 8, 'bold', 'left', '#a8a29e')
+  addText(t('qty'), expDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+  if (expDocConfig.hasPrices) {
+    addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
+    addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
+  }
+  y += 3
+  pdf.line(margin, y, pageWidth - margin, y)
+  y += 6
+
+  invoice.value.items.forEach(item => {
+    const desc = item.description?.length > 40 ? item.description.substring(0, 37) + '...' : (item.description || '—')
+    addText(desc, margin, y, 9, 'normal', 'left', '#1c1917')
+    addText(String(item.quantity), expDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+    if (expDocConfig.hasPrices) {
+      addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
+      addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
+    }
+    y += 7
+  })
+
+  y += 5
+  pdf.line(margin, y, pageWidth - margin, y)
+  y += 12
+  if (expDocConfig.hasTotals) {
+    addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+    addText(`${currency.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+    y += 6
+    addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
+    addText(`${currency.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
+    y += 8
+    pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
+    y += 6
+    addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
+    addText(`${currency.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
+  }
+
+  const expShowNotes = invoice.value.notes
+  const expShowTerms = expDocConfig.hasTerms && invoice.value.terms
+  if (expShowNotes || expShowTerms) {
+    y += 20
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 10
+
+    if (expShowNotes) {
+      addText(t('notes'), margin, y, 8, 'bold', 'left', '#a8a29e')
+      y += 6
+      const notesLines = pdf.splitTextToSize(invoice.value.notes, contentWidth)
+      notesLines.forEach((line: string) => {
+        addText(line, margin, y, 9, 'normal', 'left', '#57534e')
+        y += 5
+      })
+      y += 5
+    }
+
+    if (expShowTerms) {
+      addText(t('paymentTerms'), margin, y, 8, 'bold', 'left', '#a8a29e')
+      y += 6
+      const termsLines = pdf.splitTextToSize(invoice.value.terms, contentWidth)
+      termsLines.forEach((line: string) => {
+        addText(line, margin, y, 9, 'normal', 'left', '#57534e')
+        y += 5
+      })
+    }
+  }
+
+  if (chaosEnabled.value && chaosConfig.value.enableBadScanEffect) {
+    applyBadScanEffect(pdf, pageWidth, pageHeight)
+  }
+
+  return pdf
+}
+
 // Export handlers
-const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
+const handleExport = async (format: 'pdf' | 'png' | 'excel' | 'csv' | 'json') => {
   isExporting.value = true
   exportingFormat.value = format
 
@@ -1958,156 +2111,33 @@ const handleExport = async (format: 'pdf' | 'excel' | 'csv' | 'json') => {
 
   try {
     if (format === 'pdf') {
-      const { default: jsPDF } = await import('jspdf')
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const invoiceTitle = invoice.value.number || expDocTitle
-      pdf.setProperties({
-        title: invoiceTitle,
-        subject: `${expDocTitle} ${invoiceTitle}`,
-        creator: 'Invoice Generator',
-      })
-
-      const pageWidth = 210
-      const pageHeight = 297
-      const margin = 20
-      const contentWidth = pageWidth - margin * 2
-      let y = margin
-
-      // Add watermark to export
-      pdf.saveGraphicsState()
-      const textGState = (pdf as any).GState({ opacity: 0.08 })
-      pdf.setGState(textGState)
-      pdf.setFontSize(48)
-      pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor('#78716c')
-      const wmText = `SAMPLE ${expDocTitle}`
-      for (let i = -1; i <= 1; i++) {
-        pdf.text(wmText, pageWidth / 2, (pageHeight / 2) + (i * 80), { angle: -35, align: 'center' })
-      }
-      pdf.restoreGraphicsState()
-
-      const addText = (text: string, x: number, yPos: number, size = 9, style = 'normal', align = 'left', color = '#374151') => {
-        pdf.setFontSize(size)
-        pdf.setFont('helvetica', style)
-        pdf.setTextColor(color)
-        let finalX = x
-        if (align === 'right') finalX = x - pdf.getTextWidth(text)
-        pdf.text(text, finalX, yPos)
-      }
-
-      y += 5
-      if (invoice.value.logo) { try { pdf.addImage(invoice.value.logo, 'JPEG', margin, y, 18, 18) } catch {} }
-      addText(expDocTitle, invoice.value.logo ? margin + 25 : margin, y + 10, 24, 'bold', 'left', '#1c1917')
-      addText(invoice.value.number || 'Draft', invoice.value.logo ? margin + 25 : margin, y + 16, 10, 'normal', 'left', '#78716c')
-      addText(`${t('date')}: ${formatDate(invoice.value.date)}`, pageWidth - margin, y + 8, 9, 'normal', 'right', '#78716c')
-      if (expDocConfig.hasDueDate) {
-        addText(`${t('due')}: ${formatDate(invoice.value.dueDate)}`, pageWidth - margin, y + 14, 9, 'normal', 'right', '#78716c')
-      }
-      y += 35
-
-      // Payment method for receipts
-      if (expDocConfig.hasPaymentMethod && invoice.value.paymentMethod) {
-        const methodLabels: Record<string, string> = { cash: 'Cash', credit_card: 'Credit Card', bank_transfer: 'Bank Transfer', check: 'Check' }
-        addText(`${t('paymentMethod')}: ${methodLabels[invoice.value.paymentMethod] || invoice.value.paymentMethod}`, pageWidth - margin, y - 16, 9, 'normal', 'right', '#78716c')
-      }
-
-      addText(t('from'), margin, y, 8, 'bold', 'left', '#a8a29e')
-      addText(t('to'), pageWidth / 2 + 10, y, 8, 'bold', 'left', '#a8a29e')
-      y += 6
-
-      if (invoice.value.from.businessName) { addText(invoice.value.from.businessName, margin, y, 10, 'bold', 'left', '#1c1917'); y += 5 }
-      let fromY = y
-      if (invoice.value.from.email) { addText(invoice.value.from.email, margin, y, 9); y += 4 }
-      if (invoice.value.from.address) { addText(invoice.value.from.address, margin, y, 9); y += 4 }
-      if (invoice.value.from.phone) { addText(invoice.value.from.phone, margin, y, 9); y += 4 }
-      if (invoice.value.from.taxId) { addText(`${t('taxId')}: ${invoice.value.from.taxId}`, margin, y, 8, 'normal', 'left', '#a8a29e'); y += 4 }
-
-      let toY = fromY - 5
-      if (invoice.value.to.customerName) { addText(invoice.value.to.customerName, pageWidth / 2 + 10, toY, 10, 'bold', 'left', '#1c1917'); toY += 5 }
-      if (invoice.value.to.email) { addText(invoice.value.to.email, pageWidth / 2 + 10, toY, 9); toY += 4 }
-      if (invoice.value.to.address) { addText(invoice.value.to.address, pageWidth / 2 + 10, toY, 9); toY += 4 }
-      if (invoice.value.to.phone) { addText(invoice.value.to.phone, pageWidth / 2 + 10, toY, 9); toY += 4 }
-      if (invoice.value.to.taxId) { addText(`${t('taxId')}: ${invoice.value.to.taxId}`, pageWidth / 2 + 10, toY, 8, 'normal', 'left', '#a8a29e') }
-
-      y = Math.max(y, toY) + 15
-      pdf.setDrawColor('#e7e5e4')
-      pdf.setLineWidth(0.3)
-      pdf.line(margin, y, pageWidth - margin, y)
-      y += 6
-
-      addText(t('description'), margin, y, 8, 'bold', 'left', '#a8a29e')
-      addText(t('qty'), expDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
-      if (expDocConfig.hasPrices) {
-        addText(t('price'), pageWidth - margin - 30, y, 8, 'bold', 'right', '#a8a29e')
-        addText(t('total'), pageWidth - margin, y, 8, 'bold', 'right', '#a8a29e')
-      }
-      y += 3
-      pdf.line(margin, y, pageWidth - margin, y)
-      y += 6
-
-      invoice.value.items.forEach(item => {
-        const desc = item.description?.length > 40 ? item.description.substring(0, 37) + '...' : (item.description || '—')
-        addText(desc, margin, y, 9, 'normal', 'left', '#1c1917')
-        addText(String(item.quantity), expDocConfig.hasPrices ? pageWidth - margin - 60 : pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-        if (expDocConfig.hasPrices) {
-          addText(`${currency.value}${item.price.toFixed(2)}`, pageWidth - margin - 30, y, 9, 'normal', 'right', '#57534e')
-          addText(`${currency.value}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#1c1917')
-        }
-        y += 7
-      })
-
-      y += 5
-      pdf.line(margin, y, pageWidth - margin, y)
-      y += 12
-      if (expDocConfig.hasTotals) {
-        addText(t('subtotal'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-        addText(`${currency.value}${subtotal.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-        y += 6
-        addText(t('tax'), pageWidth - margin - 40, y, 9, 'normal', 'left', '#78716c')
-        addText(`${currency.value}${totalTax.value.toFixed(2)}`, pageWidth - margin, y, 9, 'normal', 'right', '#57534e')
-        y += 8
-        pdf.line(pageWidth - margin - 50, y, pageWidth - margin, y)
-        y += 6
-        addText(t('total'), pageWidth - margin - 40, y, 10, 'bold', 'left', '#1c1917')
-        addText(`${currency.value}${total.value.toFixed(2)}`, pageWidth - margin, y, 10, 'bold', 'right', '#1c1917')
-      }
-
-      // Notes and Payment Terms
-      const expShowNotes = invoice.value.notes
-      const expShowTerms = expDocConfig.hasTerms && invoice.value.terms
-      if (expShowNotes || expShowTerms) {
-        y += 20
-        pdf.line(margin, y, pageWidth - margin, y)
-        y += 10
-
-        if (expShowNotes) {
-          addText(t('notes'), margin, y, 8, 'bold', 'left', '#a8a29e')
-          y += 6
-          const notesLines = pdf.splitTextToSize(invoice.value.notes, contentWidth)
-          notesLines.forEach((line: string) => {
-            addText(line, margin, y, 9, 'normal', 'left', '#57534e')
-            y += 5
-          })
-          y += 5
-        }
-
-        if (expShowTerms) {
-          addText(t('paymentTerms'), margin, y, 8, 'bold', 'left', '#a8a29e')
-          y += 6
-          const termsLines = pdf.splitTextToSize(invoice.value.terms, contentWidth)
-          termsLines.forEach((line: string) => {
-            addText(line, margin, y, 9, 'normal', 'left', '#57534e')
-            y += 5
-          })
-        }
-      }
-
-      // Add bad scan effect if enabled
-      if (chaosEnabled.value && chaosConfig.value.enableBadScanEffect) {
-        applyBadScanEffect(pdf, pageWidth, pageHeight)
-      }
-
+      const pdf = await buildInvoicePdf()
       pdf.save(`${invoice.value.number || 'invoice'}.pdf`)
+    } else if (format === 'png') {
+      const pdf = await buildInvoicePdf()
+      const pdfBuffer = pdf.output('arraybuffer')
+
+      const pdfjs = await import('pdfjs-dist')
+      const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
+      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+
+      const doc = await pdfjs.getDocument({ data: pdfBuffer }).promise
+      const page = await doc.getPage(1)
+      const viewport = page.getViewport({ scale: 2 })
+      const canvas = document.createElement('canvas')
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      const ctx = canvas.getContext('2d')!
+      await page.render({ canvasContext: ctx, viewport, canvas } as any).promise
+
+      const blob: Blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob returned null')), 'image/png')
+      })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `${invoice.value.number || 'invoice'}.png`
+      a.click()
+      URL.revokeObjectURL(a.href)
     } else if (format === 'excel') {
       const { default: XLSX } = await import('xlsx')
       const wb = XLSX.utils.book_new()
