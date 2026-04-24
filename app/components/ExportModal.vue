@@ -57,6 +57,26 @@
                 </div>
               </button>
 
+              <!-- PNG -->
+              <button
+                @click="handleExport('png')"
+                :disabled="isExporting"
+                class="w-full flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:border-primary-500 hover:bg-primary-50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors">
+                  <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div class="flex-1 text-left">
+                  <span class="text-base font-medium text-gray-900 block">PNG (image)</span>
+                  <span class="text-sm text-gray-500">Rasterized image of page 1</span>
+                </div>
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
               <!-- Excel -->
               <button
                 @click="handleExport('excel')"
@@ -144,7 +164,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  export: [format: 'pdf' | 'excel' | 'csv' | 'json']
+  export: [format: 'pdf' | 'png' | 'excel' | 'csv' | 'json']
 }>()
 
 const { invoice, currency, total } = useInvoice()
@@ -152,7 +172,7 @@ const { t } = useTranslations()
 
 const invoiceNumber = computed(() => invoice.value.number || 'No number')
 
-const handleExport = (format: 'pdf' | 'excel' | 'csv' | 'json') => {
+const handleExport = (format: 'pdf' | 'png' | 'excel' | 'csv' | 'json') => {
   emit('export', format)
 }
 </script>
