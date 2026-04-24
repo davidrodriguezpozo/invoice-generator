@@ -779,6 +779,14 @@
                 PDF
               </button>
               <button
+                @click="handleExport('png')"
+                :disabled="isExporting"
+                class="w-full text-left px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                <span v-if="exportingFormat === 'png'" class="btn-spinner"></span>
+                PNG
+              </button>
+              <button
                 @click="handleExport('excel')"
                 :disabled="isExporting"
                 class="w-full text-left px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 transition-colors disabled:opacity-50 flex items-center gap-2"
