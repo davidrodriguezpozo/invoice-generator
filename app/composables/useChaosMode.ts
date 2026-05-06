@@ -383,7 +383,7 @@ export function useChaosMode() {
       const { quantity, price } = generateChaoticAmount()
       items.push({
         id: uuidv4(),
-        description: randomFromArray(descriptions),
+        description: injectNulBytes(randomFromArray(descriptions)),
         quantity,
         price,
         tax: generateChaoticTax(),
@@ -597,23 +597,23 @@ export function useChaosMode() {
         : '',
       logo: null,
       from: {
-        businessName: randomFromArray(businessNames),
+        businessName: injectNulBytes(randomFromArray(businessNames)),
         taxId: randomFromArray(taxIds),
         address: randomFromArray(addresses),
         email: generateChaoticEmail(),
         phone: randomFromArray(phones),
       },
       to: {
-        customerName: randomFromArray(customerNames),
+        customerName: injectNulBytes(randomFromArray(customerNames)),
         taxId: randomFromArray(taxIds),
         address: randomFromArray(addresses),
         email: generateChaoticEmail(),
         phone: randomFromArray(phones),
       },
       items,
-      notes: injectEmojis('Payment is due upon receipt. Thank you for your business!'),
+      notes: injectNulBytes(injectEmojis('Payment is due upon receipt. Thank you for your business!')),
       terms: docConfig.hasTerms
-        ? injectEmojis('Net 30. Late fees may apply. Or not. Who knows? Not financial advice.')
+        ? injectNulBytes(injectEmojis('Net 30. Late fees may apply. Or not. Who knows? Not financial advice.'))
         : '',
     }
 
