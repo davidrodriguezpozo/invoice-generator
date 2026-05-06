@@ -354,6 +354,22 @@ export function useChaosMode() {
     return result
   }
 
+  const injectNulBytes = (text: string): string => {
+    const { intensity, enableNulByteInjection } = chaosConfig.value
+    if (!enableNulByteInjection || !text) return text
+
+    const multiplier = getIntensityMultiplier(intensity)
+    // mild=0.3 → 1 NUL, medium=0.6 → 1 NUL, extreme=0.9 → 2 NULs
+    const nulCount = Math.max(1, Math.floor(multiplier * 3))
+
+    let result = text
+    for (let i = 0; i < nulCount; i++) {
+      const position = Math.floor(Math.random() * (result.length + 1))
+      result = result.slice(0, position) + '\0' + result.slice(position)
+    }
+    return result
+  }
+
   const generateChaoticItems = (count: number = 5): InvoiceItem[] => {
     const { enableEmojiInjection } = chaosConfig.value
     const descriptions = enableEmojiInjection
@@ -617,6 +633,7 @@ export function useChaosMode() {
     generateChaoticDates,
     generateChaoticEmail,
     injectEmojis,
+    injectNulBytes,
     generateChaoticItems,
   }
 }
