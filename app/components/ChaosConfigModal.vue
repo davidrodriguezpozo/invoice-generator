@@ -150,6 +150,7 @@ const features: { key: keyof Omit<ChaosConfig, 'intensity'>; label: string; desc
   { key: 'enableInvalidEmails', label: 'Invalid Emails', description: 'Broken email formats' },
   { key: 'enableCrazyInvoiceNumbers', label: 'Crazy Invoice Numbers', description: 'SQL injection, special chars' },
   { key: 'enableBadScanEffect', label: 'Bad Scan Effect', description: 'Randomized gradient overlay on PDF' },
+  { key: 'enableNulByteInjection', label: 'NUL Byte Injection', description: 'Inserts \\0 bytes into text fields (OCR pipeline torture test)' },
 ]
 
 const allSelected = computed(() => features.every(f => chaosConfig.value[f.key]))
