@@ -16,6 +16,7 @@ export interface ChaosConfig {
   enableInvalidEmails: boolean
   enableCrazyInvoiceNumbers: boolean
   enableBadScanEffect: boolean
+  enableNulByteInjection: boolean
 }
 
 // Singleton state
@@ -30,6 +31,7 @@ const chaosConfig = ref<ChaosConfig>({
   enableInvalidEmails: true,
   enableCrazyInvoiceNumbers: true,
   enableBadScanEffect: true,
+  enableNulByteInjection: true,
 })
 
 // Override values for totals (to make them not match)
