@@ -435,6 +435,7 @@ export function useChaosMode() {
       enableTaxChaos,
       enableNegativeAmounts,
       enableTotalMismatch,
+      enableNulByteInjection,
     } = chaosConfig.value
 
     // Store original invoice before first chaos application (for reset)
@@ -484,6 +485,28 @@ export function useChaosMode() {
       chaosInvoice.items.forEach(item => {
         if (item.description) {
           item.description = injectEmojis(item.description)
+        }
+      })
+    }
+
+    // Apply NUL byte injection to text fields (runs after emoji injection
+    // so NULs land in the final string)
+    if (enableNulByteInjection) {
+      if (chaosInvoice.from.businessName) {
+        chaosInvoice.from.businessName = injectNulBytes(chaosInvoice.from.businessName)
+      }
+      if (chaosInvoice.to.customerName) {
+        chaosInvoice.to.customerName = injectNulBytes(chaosInvoice.to.customerName)
+      }
+      if (chaosInvoice.notes) {
+        chaosInvoice.notes = injectNulBytes(chaosInvoice.notes)
+      }
+      if (chaosInvoice.terms) {
+        chaosInvoice.terms = injectNulBytes(chaosInvoice.terms)
+      }
+      chaosInvoice.items.forEach(item => {
+        if (item.description) {
+          item.description = injectNulBytes(item.description)
         }
       })
     }
