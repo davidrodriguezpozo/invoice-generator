@@ -1,14 +1,18 @@
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useChaosMode } from './useChaosMode'
+import { useRealisticGeneration } from './useRealisticGeneration'
 import { DOCUMENT_TYPE_CONFIG, useInvoice, type DocumentType, type Invoice, type SavedInvoice } from './useInvoice'
 
 export type BulkDocumentType = DocumentType | 'random'
+export type BulkGenerationMode = 'realistic' | 'chaos'
 
 export interface BulkGenerationOptions {
   count: number
   prefix: string
   documentType: BulkDocumentType
+  mode: BulkGenerationMode
+  lockContacts: boolean
   useDateRange: boolean
   startDate?: string
   endDate?: string
@@ -20,7 +24,8 @@ const progress = ref({ current: 0, total: 0 })
 
 export function useBulkGeneration() {
   const { generateChaoticInvoice } = useChaosMode()
-  const { invoiceHistory, currency } = useInvoice()
+  const { loadFaker, generateRealisticInvoice } = useRealisticGeneration()
+  const { invoice, invoiceHistory } = useInvoice()
 
   const HISTORY_KEY = 'invoice-generator-history'
 
@@ -56,29 +61,45 @@ export function useBulkGeneration() {
     const invoices: SavedInvoice[] = []
     const resolvedDocType = options.documentType === 'random' ? undefined : options.documentType
 
+    // Snapshot the editor's contacts once so the whole batch shares the same parties.
+    const lockedFrom = options.lockContacts ? JSON.parse(JSON.stringify(invoice.value.from)) : null
+    const lockedTo = options.lockContacts ? JSON.parse(JSON.stringify(invoice.value.to)) : null
+
     try {
+      if (options.mode === 'realistic') {
+        await loadFaker()
+      }
+
       for (let i = 0; i < options.count; i++) {
-        // Generate chaotic document of the requested type (or random)
-        const invoice = generateChaoticInvoice(resolvedDocType)
+        // Generate document of the requested type (or random) in the chosen mode
+        const doc = options.mode === 'realistic'
+          ? generateRealisticInvoice(resolvedDocType)
+          : generateChaoticInvoice(resolvedDocType)
 
         // Apply custom number with prefix
-        invoice.number = `${options.prefix}${String(i + 1).padStart(3, '0')}`
+        doc.number = `${options.prefix}${String(i + 1).padStart(3, '0')}`
+
+        // Lock sender/recipient to the current editor document if requested
+        if (options.lockContacts) {
+          doc.from = JSON.parse(JSON.stringify(lockedFrom))
+          doc.to = JSON.parse(JSON.stringify(lockedTo))
+        }
 
         // Apply date range if enabled
         if (options.useDateRange && options.startDate && options.endDate) {
-          invoice.date = randomDateInRange(options.startDate, options.endDate)
-          const docConfig = DOCUMENT_TYPE_CONFIG[invoice.documentType]
-          invoice.dueDate = docConfig.hasDueDate ? addDays(invoice.date, 30) : ''
+          doc.date = randomDateInRange(options.startDate, options.endDate)
+          const docConfig = DOCUMENT_TYPE_CONFIG[doc.documentType]
+          doc.dueDate = docConfig.hasDueDate ? addDays(doc.date, 30) : ''
         }
 
         // Create saved invoice
         const savedInvoice: SavedInvoice = {
           id: uuidv4(),
-          invoice,
+          invoice: doc,
           savedAt: new Date().toISOString(),
-          totalAmount: calculateTotal(invoice),
-          customerName: invoice.to.customerName,
-          documentType: invoice.documentType,
+          totalAmount: calculateTotal(doc),
+          customerName: doc.to.customerName,
+          documentType: doc.documentType,
         }
 
         invoices.push(savedInvoice)

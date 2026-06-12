@@ -39,6 +39,26 @@
               </div>
             </div>
 
+            <!-- Mode -->
+            <div>
+              <div class="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Data Mode</div>
+              <div class="flex gap-1">
+                <button
+                  v-for="m in modeOptions"
+                  :key="m.value"
+                  @click="options.mode = m.value"
+                  :class="[
+                    'flex-1 py-2 text-sm font-medium transition-colors',
+                    options.mode === m.value
+                      ? 'bg-stone-900 text-white'
+                      : 'text-stone-500 hover:bg-stone-100'
+                  ]"
+                >
+                  {{ m.label }}
+                </button>
+              </div>
+            </div>
+
             <!-- Document Type -->
             <div>
               <div class="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Document Type</div>
@@ -104,8 +124,26 @@
               </div>
             </div>
 
+            <!-- Lock Contacts -->
+            <div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="options.lockContacts"
+                  class="w-4 h-4 border-stone-300 text-stone-900 focus:ring-stone-500"
+                />
+                <span class="text-sm text-stone-700">Lock sender &amp; recipient to current document</span>
+              </label>
+
+              <div v-if="options.lockContacts" class="mt-2 bg-stone-50 p-2 text-[11px] text-stone-500 leading-relaxed">
+                From: <span class="text-stone-700 font-medium">{{ lockedContactsPreview.from }}</span>
+                <span class="mx-1">→</span>
+                To: <span class="text-stone-700 font-medium">{{ lockedContactsPreview.to }}</span>
+              </div>
+            </div>
+
             <!-- Chaos Settings Note -->
-            <div class="bg-stone-50 p-3 text-xs text-stone-500">
+            <div v-if="options.mode === 'chaos'" class="bg-stone-50 p-3 text-xs text-stone-500">
               <div class="flex items-start gap-2">
                 <svg class="w-4 h-4 text-stone-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -156,8 +194,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useBulkGeneration, type BulkDocumentType } from '../composables/useBulkGeneration'
+import { reactive, computed } from 'vue'
+import { useBulkGeneration, type BulkDocumentType, type BulkGenerationMode } from '../composables/useBulkGeneration'
+import { useInvoice } from '../composables/useInvoice'
 
 defineProps<{
   isOpen: boolean
@@ -169,8 +208,20 @@ const emit = defineEmits<{
 }>()
 
 const { isGenerating, progress, generateBulkInvoices } = useBulkGeneration()
+const { invoice } = useInvoice()
 
 const countOptions = [5, 10, 25, 50, 100]
+
+const modeOptions: { value: BulkGenerationMode; label: string }[] = [
+  { value: 'realistic', label: 'Realistic' },
+  { value: 'chaos', label: 'Chaos' },
+]
+
+// Preview of the contacts that will be locked in, read from the live editor invoice
+const lockedContactsPreview = computed(() => ({
+  from: invoice.value.from.businessName || '—',
+  to: invoice.value.to.customerName || '—',
+}))
 
 const documentTypeOptions: { value: BulkDocumentType; label: string }[] = [
   { value: 'random', label: 'Random' },
@@ -189,6 +240,8 @@ const options = reactive({
   count: 10,
   prefix: 'TEST-',
   documentType: 'random' as BulkDocumentType,
+  mode: 'realistic' as BulkGenerationMode,
+  lockContacts: false,
   useDateRange: false,
   startDate: sixMonthsAgo.toISOString().split('T')[0],
   endDate: today.toISOString().split('T')[0],
