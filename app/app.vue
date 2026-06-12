@@ -851,6 +851,7 @@
     <!-- Bulk Generate Modal -->
     <BulkGenerateModal
       :is-open="showBulkGenerate"
+      :editor-invoice="invoice"
       @close="showBulkGenerate = false"
       @generated="handleBulkGenerated"
     />

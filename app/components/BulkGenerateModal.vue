@@ -196,10 +196,11 @@
 <script setup lang="ts">
 import { reactive, computed } from 'vue'
 import { useBulkGeneration, type BulkDocumentType, type BulkGenerationMode } from '../composables/useBulkGeneration'
-import { useInvoice } from '../composables/useInvoice'
+import type { Invoice } from '../composables/useInvoice'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
+  editorInvoice: Invoice
 }>()
 
 const emit = defineEmits<{
@@ -208,7 +209,6 @@ const emit = defineEmits<{
 }>()
 
 const { isGenerating, progress, generateBulkInvoices } = useBulkGeneration()
-const { invoice } = useInvoice()
 
 const countOptions = [5, 10, 25, 50, 100]
 
@@ -217,10 +217,10 @@ const modeOptions: { value: BulkGenerationMode; label: string }[] = [
   { value: 'chaos', label: 'Chaos' },
 ]
 
-// Preview of the contacts that will be locked in, read from the live editor invoice
+// Preview of the contacts that will be locked in, read from the current editor document
 const lockedContactsPreview = computed(() => ({
-  from: invoice.value.from.businessName || '—',
-  to: invoice.value.to.customerName || '—',
+  from: props.editorInvoice.from.businessName || '—',
+  to: props.editorInvoice.to.customerName || '—',
 }))
 
 const documentTypeOptions: { value: BulkDocumentType; label: string }[] = [
@@ -248,7 +248,7 @@ const options = reactive({
 })
 
 const handleGenerate = async () => {
-  const invoices = await generateBulkInvoices(options)
+  const invoices = await generateBulkInvoices(options, props.editorInvoice)
   emit('generated', invoices.length)
   emit('close')
 }

@@ -25,7 +25,7 @@ const progress = ref({ current: 0, total: 0 })
 export function useBulkGeneration() {
   const { generateChaoticInvoice } = useChaosMode()
   const { loadFaker, generateRealisticInvoice } = useRealisticGeneration()
-  const { invoice, invoiceHistory } = useInvoice()
+  const { invoiceHistory } = useInvoice()
 
   const HISTORY_KEY = 'invoice-generator-history'
 
@@ -53,8 +53,12 @@ export function useBulkGeneration() {
     }, 0)
   }
 
-  // Generate bulk invoices
-  const generateBulkInvoices = async (options: BulkGenerationOptions): Promise<SavedInvoice[]> => {
+  // Generate bulk invoices. `sourceInvoice` is the current editor document, used
+  // to pin sender/recipient when options.lockContacts is enabled.
+  const generateBulkInvoices = async (
+    options: BulkGenerationOptions,
+    sourceInvoice?: Invoice,
+  ): Promise<SavedInvoice[]> => {
     isGenerating.value = true
     progress.value = { current: 0, total: options.count }
 
@@ -62,8 +66,8 @@ export function useBulkGeneration() {
     const resolvedDocType = options.documentType === 'random' ? undefined : options.documentType
 
     // Snapshot the editor's contacts once so the whole batch shares the same parties.
-    const lockedFrom = options.lockContacts ? JSON.parse(JSON.stringify(invoice.value.from)) : null
-    const lockedTo = options.lockContacts ? JSON.parse(JSON.stringify(invoice.value.to)) : null
+    const lockedFrom = options.lockContacts && sourceInvoice ? JSON.parse(JSON.stringify(sourceInvoice.from)) : null
+    const lockedTo = options.lockContacts && sourceInvoice ? JSON.parse(JSON.stringify(sourceInvoice.to)) : null
 
     try {
       if (options.mode === 'realistic') {
@@ -80,7 +84,7 @@ export function useBulkGeneration() {
         doc.number = `${options.prefix}${String(i + 1).padStart(3, '0')}`
 
         // Lock sender/recipient to the current editor document if requested
-        if (options.lockContacts) {
+        if (lockedFrom && lockedTo) {
           doc.from = JSON.parse(JSON.stringify(lockedFrom))
           doc.to = JSON.parse(JSON.stringify(lockedTo))
         }
